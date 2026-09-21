@@ -6,6 +6,7 @@ import { parseExpenseText } from "@/lib/parser/expense-parser";
 import { categorizeExpense } from "@/lib/parser/categorizer";
 import { formatCurrency } from "@/lib/utils/format";
 import { prisma } from "@/lib/prisma";
+import { isRateLimited } from "@/lib/utils/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +29,16 @@ export async function POST(req: NextRequest) {
     const chatId = message.chat.id;
     const text = message.text.trim();
     const username = message.from?.username || message.from?.first_name || "User";
+
+    // Rate Limiting: Batasi maksimal 20 pesan per menit per user
+    if (isRateLimited(`telegram:${chatId}`, 20, 60_000)) {
+      console.warn(`[Webhook] Rate limit exceeded for chat: ${chatId}`);
+      await sendTelegramMessage(
+        chatId,
+        "⏳ <b>Terlalu banyak pesan.</b> Mohon tunggu sebentar sebelum mengirim pesan lagi.",
+      );
+      return NextResponse.json({ ok: true });
+    }
 
     // 3. Tangani Command /start
     if (text === "/start") {
@@ -58,7 +69,7 @@ export async function POST(req: NextRequest) {
     if (text.startsWith("/")) {
       await sendTelegramMessage(
         chatId,
-        "⚠️ Perintah tidak dikenali. Ketik <b>/help</b> untuk melihat panduan yang tersedia."
+        "⚠️ Perintah tidak dikenali. Ketik <b>/help</b> untuk melihat panduan yang tersedia.",
       );
       return NextResponse.json({ ok: true });
     }
@@ -128,13 +139,13 @@ export async function POST(req: NextRequest) {
           itemName: parsed.itemName,
           amountFormatted,
           categoryName: categoryDisplayName,
-        })
+        }),
       );
     } catch (dbError) {
       console.error("[Webhook] Gagal menyimpan transaksi ke DB:", dbError);
       await sendTelegramMessage(
         chatId,
-        "⚠️ Terjadi gangguan saat menyimpan data. Silakan coba lagi sebentar lagi."
+        "⚠️ Terjadi gangguan saat menyimpan data. Silakan coba lagi sebentar lagi.",
       );
     }
 
