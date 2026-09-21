@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateTelegramWebhook } from "@/lib/telegram/validate";
 import { sendTelegramMessage } from "@/lib/telegram/bot";
 import { TELEGRAM_MESSAGES } from "@/lib/telegram/messages";
+import { parseExpenseText } from "@/lib/parser/expense-parser";
+import { categorizeExpense } from "@/lib/parser/categorizer";
+import { formatCurrency } from "@/lib/utils/format";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
@@ -17,7 +20,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const message = body.message;
 
-    // Abaikan jika bukan pesan teks (misal: bot joined channel, photo, dll)
+    // Abaikan jika bukan pesan teks
     if (!message || !message.text) {
       return NextResponse.json({ ok: true });
     }
@@ -29,7 +32,6 @@ export async function POST(req: NextRequest) {
     // 3. Tangani Command /start
     if (text === "/start") {
       try {
-        // Simpan / update user di database PostgreSQL via Prisma
         await prisma.user.upsert({
           where: { telegramChatId: BigInt(chatId) },
           update: { telegramUsername: username },
@@ -52,13 +54,93 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Catatan: Pemrosesan pesan pengeluaran biasa ("kopi 25k")
-    // akan kita hubungkan di Task 10.
+    // 5. Tangani Perintah yang tidak dikenali (jika diawali '/')
+    if (text.startsWith("/")) {
+      await sendTelegramMessage(
+        chatId,
+        "⚠️ Perintah tidak dikenali. Ketik <b>/help</b> untuk melihat panduan yang tersedia."
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // 6. Alur Pencatatan Pengeluaran (Expense Recording Flow)
+    const parsed = parseExpenseText(text);
+
+    if (!parsed) {
+      // Teks bukan command dan tidak terbaca sebagai pengeluaran yang valid
+      await sendTelegramMessage(chatId, TELEGRAM_MESSAGES.parseFailed());
+      return NextResponse.json({ ok: true });
+    }
+
+    try {
+      // Pastikan user ada di DB
+      const user = await prisma.user.upsert({
+        where: { telegramChatId: BigInt(chatId) },
+        update: { telegramUsername: username },
+        create: {
+          telegramChatId: BigInt(chatId),
+          telegramUsername: username,
+        },
+      });
+
+      // Deteksi kategori pengeluaran
+      const detectedCategory = categorizeExpense(parsed.itemName);
+      const categoryDisplayName = detectedCategory ?? "Lainnya";
+
+      let categoryId: string | null = null;
+      if (detectedCategory) {
+        // Cari atau buat kategori untuk user ini
+        const category = await prisma.category.upsert({
+          where: {
+            userId_name: {
+              userId: user.id,
+              name: detectedCategory,
+            },
+          },
+          update: {},
+          create: {
+            userId: user.id,
+            name: detectedCategory,
+            keywords: [],
+          },
+        });
+        categoryId = category.id;
+      }
+
+      // Simpan catatan transaksi pengeluaran
+      await prisma.expense.create({
+        data: {
+          userId: user.id,
+          itemName: parsed.itemName,
+          amount: parsed.amount,
+          currency: parsed.currency,
+          categoryId,
+          rawText: text,
+          source: "TELEGRAM",
+        },
+      });
+
+      // Kirim notifikasi konfirmasi sukses ke chat Telegram
+      const amountFormatted = formatCurrency(parsed.amount, parsed.currency);
+      await sendTelegramMessage(
+        chatId,
+        TELEGRAM_MESSAGES.expenseRecorded({
+          itemName: parsed.itemName,
+          amountFormatted,
+          categoryName: categoryDisplayName,
+        })
+      );
+    } catch (dbError) {
+      console.error("[Webhook] Gagal menyimpan transaksi ke DB:", dbError);
+      await sendTelegramMessage(
+        chatId,
+        "⚠️ Terjadi gangguan saat menyimpan data. Silakan coba lagi sebentar lagi."
+      );
+    }
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[Webhook Error]:", error);
-    // Penting: Selalu return 200 OK ke Telegram agar Telegram tidak
-    // melakukan retry loop terus-menerus saat ada error internal aplikasi.
     return NextResponse.json({ ok: true });
   }
 }
