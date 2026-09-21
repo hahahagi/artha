@@ -40,6 +40,84 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // Tangani Pairing Akun Web <-> Telegram (/start link_TOKEN atau /link TOKEN)
+    const isStartLink = text.startsWith("/start link_");
+    const isDirectLink = text.startsWith("/link ");
+
+    if (isStartLink || isDirectLink) {
+      const token = isStartLink
+        ? text.replace("/start link_", "").trim()
+        : text.replace("/link ", "").trim();
+
+      if (!token) {
+        await sendTelegramMessage(
+          chatId,
+          "⚠️ Token pairing tidak boleh kosong. Gunakan link dari web atau ketik <code>/link TOKEN</code>.",
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      // Cari user di web yang memiliki linkToken aktif
+      const webUser = await prisma.user.findFirst({
+        where: {
+          linkToken: token,
+          linkTokenExpiry: { gte: new Date() },
+        },
+      });
+
+      if (!webUser) {
+        await sendTelegramMessage(
+          chatId,
+          "❌ <b>Token tidak valid atau sudah kedaluwarsa.</b>\nSilakan buat tautan baru di halaman Pengaturan dashboard web.",
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      try {
+        // Cek apakah ada temporary user lain yang pernah terbuat dengan chatId ini
+        const existingTelegramUser = await prisma.user.findUnique({
+          where: { telegramChatId: BigInt(chatId) },
+        });
+
+        if (existingTelegramUser && existingTelegramUser.id !== webUser.id) {
+          // Pindahkan seluruh riwayat transaksi dari bot ke akun web
+          await prisma.expense.updateMany({
+            where: { userId: existingTelegramUser.id },
+            data: { userId: webUser.id },
+          });
+
+          // Hapus akun sementara bot
+          await prisma.user.delete({
+            where: { id: existingTelegramUser.id },
+          });
+        }
+
+        // Tautkan telegramChatId ke akun webUser
+        await prisma.user.update({
+          where: { id: webUser.id },
+          data: {
+            telegramChatId: BigInt(chatId),
+            telegramUsername: username,
+            linkToken: null,
+            linkTokenExpiry: null,
+          },
+        });
+
+        await sendTelegramMessage(
+          chatId,
+          `🎉 <b>Akun Berhasil Dihubungkan!</b>\n\nAkun Telegram Anda resmi terhubung dengan akun web <b>${webUser.email}</b>.\nSetiap pengeluaran yang dicatat di sini otomatis muncul di dashboard web!`,
+        );
+      } catch (linkError) {
+        console.error("[Webhook Pairing Error]:", linkError);
+        await sendTelegramMessage(
+          chatId,
+          "⚠️ Terjadi kendala saat menghubungkan akun. Silakan coba lagi.",
+        );
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
     // 3. Tangani Command /start
     if (text === "/start") {
       try {
