@@ -1,0 +1,56 @@
+export const TELEGRAM_MESSAGES = {
+  welcome: (username?: string) => `
+👋 <b>Halo ${username ? `@${username}` : "Kak"}! Selamat datang di Artha.</b>
+
+Artha siap mencatat pengeluaran harianmu tanpa ribet. Cukup ketik langsung apa yang kamu beli:
+• <code>kopi susu 25k</code>
+• <code>bensin 30.000</code>
+• <code>2x 15k mie ayam</code>
+• <code>$15 lunch meeting</code>
+
+Kategori dan nominal akan otomatis dideteksi! ✨
+
+Ketik <b>/help</b> untuk melihat panduan lengkap.
+`.trim(),
+
+  help: () => `
+📖 <b>Panduan Penggunaan Artha</b>
+
+1. <b>Catat Pengeluaran:</b>
+   Ketik item dan nominalnya.
+   Contoh: <code>makan siang 35rb</code>
+
+2. <b>Jumlah Multiplier:</b>
+   Gunakan format <code>[qty]x</code>.
+   Contoh: <code>3x 20k ramen</code>
+
+3. <b>Multi-Mata Uang:</b>
+   Bisa simbol atau kode kata uang.
+   Contoh: <code>$25 buku</code> atau <code>100 usd hotel</code>
+
+4. <b>Batal Catat:</b>
+   Ketik <b>/batal</b> untuk menghapus pengeluaran terakhir.
+
+5. <b>Rekapitulasi:</b>
+   Ketik <b>/rekap</b> untuk ringkasan pengeluaranmu.
+`.trim(),
+
+  expenseRecorded: (data: {
+    itemName: string;
+    amountFormatted: string;
+    categoryName: string;
+  }) => `
+✅ <b>Pengeluaran Berhasil Dicatat!</b>
+
+📝 <b>Item:</b> ${data.itemName}
+💰 <b>Nominal:</b> ${data.amountFormatted}
+🏷️ <b>Kategori:</b> ${data.categoryName}
+`.trim(),
+
+  parseFailed: () => `
+⚠️ <b>Format tidak dikenali</b>
+
+Pastikan memasukkan nama barang dan nominal harga.
+Contoh: <code>kopi 25k</code> atau <code>bensin 30.000</code>
+`.trim(),
+};
