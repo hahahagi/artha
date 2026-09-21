@@ -23,7 +23,7 @@ export default async function DashboardLayout({
       <DashboardSidebar userEmail={user.email} />
 
       {/* Konten Utama */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-w-0">
         <DashboardHeader userEmail={user.email} />
         <main className="flex-1 p-4 md:p-8">{children}</main>
       </div>
