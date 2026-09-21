@@ -14,6 +14,6 @@ export const config = {
      * - favicon.ico (ikon tab browser)
      * - file ekstensi gambar / font (.svg, .png, dll)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webmanifest)$).*)",
   ],
 };
