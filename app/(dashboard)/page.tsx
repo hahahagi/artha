@@ -8,8 +8,36 @@ import {
   ExpenseTrendChart,
   CategoryDistributionChart,
 } from "@/components/dashboard/overview-charts";
-import { Receipt, CreditCard, ArrowUpRight, AlertCircle } from "lucide-react";
+import {
+  Receipt,
+  CreditCard,
+  ArrowUpRight,
+  AlertCircle,
+  CalendarClock,
+  Clock,
+} from "lucide-react";
 import Link from "next/link";
+
+/**
+ * Helper menghitung sisa hari menuju tanggal tagihan berikutnya
+ */
+function getDaysUntilBilling(billingDay: number): number {
+  const today = new Date();
+  const currentDay = today.getDate();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+
+  let targetDate = new Date(currentYear, currentMonth, billingDay);
+
+  // Jika tanggal tagihan bulan ini sudah lewat
+  if (currentDay > billingDay) {
+    targetDate = new Date(currentYear, currentMonth + 1, billingDay);
+  }
+
+  const todayStart = new Date(currentYear, currentMonth, currentDay).getTime();
+  const diffTime = targetDate.getTime() - todayStart;
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+}
 
 export default async function DashboardOverviewPage() {
   const supabase = await createClient();
@@ -21,7 +49,7 @@ export default async function DashboardOverviewPage() {
     redirect("/login");
   }
 
-  // 1. Ambil data pengguna dan seluruh transaksinya dari Prisma
+  // 1. Ambil data pengguna, pengeluaran, dan langganannya dari Prisma
   const dbUser = await prisma.user.findUnique({
     where: { email: user.email },
     include: {
@@ -29,7 +57,9 @@ export default async function DashboardOverviewPage() {
         include: { category: true },
         orderBy: { createdAt: "desc" },
       },
-      subscriptions: true,
+      subscriptions: {
+        orderBy: { billingDay: "asc" },
+      },
     },
   });
 
@@ -52,7 +82,7 @@ export default async function DashboardOverviewPage() {
     0
   );
 
-  // 3. Agregasi Data Grafik Tren (Berdasarkan tanggal)
+  // 3. Agregasi Data Grafik Tren
   const dailyMap: Record<string, number> = {};
   [...expenses].reverse().forEach((e) => {
     const d = new Date(e.createdAt);
@@ -82,6 +112,15 @@ export default async function DashboardOverviewPage() {
 
   // 5. Ambil 5 transaksi terbaru
   const recentExpenses = expenses.slice(0, 5);
+
+  // 6. Urutkan langganan aktif berdasarkan jadwal jatuh tempo terdekat
+  const activeSubs = subscriptions
+    .filter((s) => s.isActive)
+    .map((s) => ({
+      ...s,
+      daysLeft: getDaysUntilBilling(s.billingDay),
+    }))
+    .sort((a, b) => a.daysLeft - b.daysLeft);
 
   return (
     <div className="space-y-6">
@@ -134,7 +173,7 @@ export default async function DashboardOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {subscriptions.length} Layanan
+              {subscriptions.filter((s) => s.isActive).length} Layanan
             </div>
             <p className="mt-1 text-xs text-zinc-400">
               Pengingat H-3 sebelum tagihan jatuh tempo
@@ -162,7 +201,7 @@ export default async function DashboardOverviewPage() {
             <p className="mt-1 text-xs text-zinc-400">
               {isTelegramLinked
                 ? "Chat bot aktif sinkron ke akun ini"
-                : "Tautkan via menu Pengaturan (Task 7)"}
+                : "Tautkan via menu Pengaturan"}
             </p>
           </CardContent>
         </Card>
@@ -193,57 +232,133 @@ export default async function DashboardOverviewPage() {
         </Card>
       </div>
 
-      {/* Transaksi Terakhir */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-semibold">
-            Transaksi Terakhir
-          </CardTitle>
-          <Link
-            href="/expenses"
-            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            Lihat Semua →
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {recentExpenses.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-400">
-              Belum ada transaksi tercatat untuk akun ini.
+      {/* Bottom Grid: Transaksi Terakhir & Jadwal Langganan Rutin */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Kolom Kiri: Transaksi Terakhir */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">
+              Transaksi Terakhir
+            </CardTitle>
+            <Link
+              href="/expenses"
+              className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              Lihat Semua →
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {recentExpenses.length === 0 ? (
+              <div className="py-8 text-center text-sm text-zinc-400">
+                Belum ada transaksi tercatat untuk akun ini.
+              </div>
+            ) : (
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {recentExpenses.map((exp) => (
+                  <div
+                    key={exp.id}
+                    className="flex items-center justify-between py-3"
+                  >
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {exp.itemName}
+                      </p>
+                      <p className="text-xs text-zinc-400">
+                        {new Date(exp.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary" className="text-xs">
+                        {exp.category?.name || "Lainnya"}
+                      </Badge>
+                      <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {formatCurrency(exp.amount, exp.currency)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Kolom Kanan: Jadwal Langganan Rutin */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-zinc-500" />
+              <CardTitle className="text-base font-semibold">
+                Jadwal Tagihan Terdekat
+              </CardTitle>
             </div>
-          ) : (
-            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {recentExpenses.map((exp) => (
-                <div
-                  key={exp.id}
-                  className="flex items-center justify-between py-3"
+            <Link
+              href="/subscriptions"
+              className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              Kelola Langganan →
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {activeSubs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Clock className="h-8 w-8 text-zinc-300 dark:text-zinc-600 mb-2" />
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Belum ada langganan aktif.
+                </p>
+                <Link
+                  href="/subscriptions"
+                  className="mt-2 text-xs font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
                 >
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {exp.itemName}
-                    </p>
-                    <p className="text-xs text-zinc-400">
-                      {new Date(exp.createdAt).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="text-xs">
-                      {exp.category?.name || "Lainnya"}
-                    </Badge>
-                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {formatCurrency(exp.amount, exp.currency)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  + Tambah Langganan Baru
+                </Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {activeSubs.map((sub) => {
+                  const isDueSoon = sub.daysLeft <= 3;
+                  return (
+                    <div
+                      key={sub.id}
+                      className="flex items-center justify-between py-3"
+                    >
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {sub.serviceName}
+                        </p>
+                        <p className="text-xs text-zinc-400">
+                          Setiap tanggal {sub.billingDay}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Badge
+                          variant={isDueSoon ? "default" : "secondary"}
+                          className={`text-xs ${
+                            isDueSoon
+                              ? "bg-amber-500 text-white hover:bg-amber-600"
+                              : ""
+                          }`}
+                        >
+                          {sub.daysLeft === 0
+                            ? "Hari Ini"
+                            : `${sub.daysLeft} hari lagi`}
+                        </Badge>
+                        <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {formatCurrency(sub.amount, sub.currency)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
