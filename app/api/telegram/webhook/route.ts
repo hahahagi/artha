@@ -7,6 +7,7 @@ import { categorizeExpense } from "@/lib/parser/categorizer";
 import { formatCurrency } from "@/lib/utils/format";
 import { prisma } from "@/lib/prisma";
 import { isRateLimited } from "@/lib/utils/rate-limit";
+import { parseSubscriptionText } from "@/lib/parser/subscription-parser";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +29,8 @@ export async function POST(req: NextRequest) {
 
     const chatId = message.chat.id;
     const text = message.text.trim();
-    const username = message.from?.username || message.from?.first_name || "User";
+    const username =
+      message.from?.username || message.from?.first_name || "User";
 
     // Rate Limiting: Batasi maksimal 20 pesan per menit per user
     if (isRateLimited(`telegram:${chatId}`, 20, 60_000)) {
@@ -143,7 +145,127 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // 5. Tangani Perintah yang tidak dikenali (jika diawali '/')
+    // 5. Tangani Command /sub (Manajemen Langganan Rutin)
+    if (text === "/sub" || text.startsWith("/sub ") || text === "/subs") {
+      const subArgs = text.replace(/^\/subs?\s*/i, "").trim();
+
+      // Kasus A: Panduan penggunaan /sub
+      if (!subArgs || subArgs === "help") {
+        const helpText = `
+📋 <b>Panduan Langganan Rutin (/sub)</b>
+
+Gunakan format:
+<code>/sub &lt;Nama Layanan&gt; &lt;Nominal&gt; tgl &lt;1-31&gt;</code>
+
+<b>Contoh:</b>
+• <code>/sub Netflix 54k tgl 15</code>
+• <code>/sub Spotify 55.000 tgl 25</code>
+• <code>/sub iCloud 15rb tgl 5</code>
+• <code>/sub ChatGPT 20 usd tgl 1</code>
+
+Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
+`.trim();
+        await sendTelegramMessage(chatId, helpText);
+        return NextResponse.json({ ok: true });
+      }
+
+      // Pastikan user ada di database
+      const user = await prisma.user.upsert({
+        where: { telegramChatId: BigInt(chatId) },
+        update: { telegramUsername: username },
+        create: {
+          telegramChatId: BigInt(chatId),
+          telegramUsername: username,
+        },
+      });
+
+      // Kasus B: Menampilkan daftar langganan aktif (/sub list)
+      if (subArgs === "list") {
+        const subs = await prisma.subscription.findMany({
+          where: { userId: user.id },
+          orderBy: { billingDay: "asc" },
+        });
+
+        if (subs.length === 0) {
+          await sendTelegramMessage(
+            chatId,
+            "📭 <b>Belum ada langganan terdaftar.</b>\nKetik contoh: <code>/sub Netflix 54k tgl 15</code>",
+          );
+          return NextResponse.json({ ok: true });
+        }
+
+        const listText = subs
+          .map((s) => {
+            const statusIcon = s.isActive ? "🟢" : "⚪ (Dijeda)";
+            return `• <b>${s.serviceName}</b>: ${formatCurrency(s.amount, s.currency)} (Setiap tgl ${s.billingDay}) ${statusIcon}`;
+          })
+          .join("\n");
+
+        await sendTelegramMessage(
+          chatId,
+          `📋 <b>Daftar Langganan Rutin Anda:</b>\n\n${listText}`,
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      // Kasus C: Mendaftarkan Langganan Baru
+      const parsedSub = parseSubscriptionText(subArgs);
+
+      if (!parsedSub) {
+        await sendTelegramMessage(
+          chatId,
+          "⚠️ <b>Format tidak dikenali.</b>\nPastikan menyertakan nama layanan, nominal, dan tanggal tagihan.\nContoh: <code>/sub Netflix 54k tgl 15</code>",
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      try {
+        await prisma.subscription.upsert({
+          where: {
+            userId_serviceName: {
+              userId: user.id,
+              serviceName: parsedSub.serviceName,
+            },
+          },
+          update: {
+            amount: parsedSub.amount,
+            currency: parsedSub.currency,
+            billingDay: parsedSub.billingDay,
+            isActive: true,
+          },
+          create: {
+            userId: user.id,
+            serviceName: parsedSub.serviceName,
+            amount: parsedSub.amount,
+            currency: parsedSub.currency,
+            billingDay: parsedSub.billingDay,
+            isActive: true,
+          },
+        });
+
+        const confirmMsg = `
+✅ <b>Langganan Berhasil Dicatat!</b>
+
+📺 <b>Layanan:</b> ${parsedSub.serviceName}
+💰 <b>Biaya:</b> ${formatCurrency(parsedSub.amount, parsedSub.currency)} /bulan
+📅 <b>Jatuh Tempo:</b> Tanggal ${parsedSub.billingDay} setiap bulan
+
+💡 <i>Artha akan mengirimkan pengingat otomatis pada H-3 dan hari-H sebelum tanggal perpanjangan.</i>
+`.trim();
+
+        await sendTelegramMessage(chatId, confirmMsg);
+      } catch (err) {
+        console.error("[Webhook /sub Error]:", err);
+        await sendTelegramMessage(
+          chatId,
+          "⚠️ Gagal mencatat langganan ke database. Silakan coba lagi.",
+        );
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // 6. Tangani Perintah yang tidak dikenali (jika diawali '/')
     if (text.startsWith("/")) {
       await sendTelegramMessage(
         chatId,
@@ -152,7 +274,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // 6. Alur Pencatatan Pengeluaran (Expense Recording Flow)
+    // 7. Alur Pencatatan Pengeluaran (Expense Recording Flow)
     const parsed = parseExpenseText(text);
 
     if (!parsed) {
