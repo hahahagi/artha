@@ -4,10 +4,8 @@ import {
   Send,
   ArrowRight,
   Sparkles,
-  ShieldCheck,
   CalendarClock,
   BarChart3,
-  CheckCircle2,
   Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

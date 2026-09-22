@@ -25,7 +25,6 @@ import {
   Trash2,
   Plus,
   X,
-  Check,
   Receipt,
 } from "lucide-react";
 

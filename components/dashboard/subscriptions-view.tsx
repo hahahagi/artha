@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +26,6 @@ import {
   Trash2,
   X,
   CreditCard,
-  AlertCircle,
   Clock,
   CheckCircle2,
   PauseCircle,
@@ -82,22 +87,26 @@ export function SubscriptionsView({
   // Filter Langganan
   const filteredSubs = useMemo(() => {
     return initialSubscriptions.filter((sub) =>
-      sub.serviceName.toLowerCase().includes(search.toLowerCase())
+      sub.serviceName.toLowerCase().includes(search.toLowerCase()),
     );
   }, [initialSubscriptions, search]);
 
   // Statistik Ringkas
-  const activeSubs = initialSubscriptions.filter((s) => s.isActive);
+  const activeSubs = useMemo(() => {
+    return initialSubscriptions.filter((s) => s.isActive);
+  }, [initialSubscriptions]);
   const totalMonthly = activeSubs.reduce(
     (sum, s) => (s.currency === "IDR" ? sum + s.amount : sum),
-    0
+    0,
   );
 
   // Cari tagihan terdekat
   const upcomingSub = useMemo(() => {
     if (activeSubs.length === 0) return null;
     return [...activeSubs].sort((a, b) => {
-      return getDaysUntilBilling(a.billingDay) - getDaysUntilBilling(b.billingDay);
+      return (
+        getDaysUntilBilling(a.billingDay) - getDaysUntilBilling(b.billingDay)
+      );
     })[0];
   }, [activeSubs]);
 
@@ -211,7 +220,8 @@ export function SubscriptionsView({
               </span>
             </div>
             <p className="mt-1 text-xs text-zinc-400">
-              {initialSubscriptions.length - activeSubs.length} langganan sedang dijeda
+              {initialSubscriptions.length - activeSubs.length} langganan sedang
+              dijeda
             </p>
           </CardContent>
         </Card>
@@ -236,7 +246,9 @@ export function SubscriptionsView({
                 </p>
               </div>
             ) : (
-              <div className="text-sm text-zinc-400 py-1">Tidak ada tagihan aktif</div>
+              <div className="text-sm text-zinc-400 py-1">
+                Tidak ada tagihan aktif
+              </div>
             )}
           </CardContent>
         </Card>
@@ -267,7 +279,8 @@ export function SubscriptionsView({
             Belum ada langganan terdaftar
           </h3>
           <p className="text-xs text-zinc-400 max-w-sm mt-1 mb-4">
-            Catat langganan rutin seperti Netflix, Spotify, atau WiFi untuk mendapatkan pengingat sebelum perpanjangan.
+            Catat langganan rutin seperti Netflix, Spotify, atau WiFi untuk
+            mendapatkan pengingat sebelum perpanjangan.
           </p>
           <Button onClick={() => setIsAddOpen(true)} size="sm">
             Tambah Langganan Pertama
@@ -283,7 +296,9 @@ export function SubscriptionsView({
               <Card
                 key={sub.id}
                 className={`relative overflow-hidden transition hover:shadow-md ${
-                  !sub.isActive ? "opacity-60 bg-zinc-50/50 dark:bg-zinc-900/30" : ""
+                  !sub.isActive
+                    ? "opacity-60 bg-zinc-50/50 dark:bg-zinc-900/30"
+                    : ""
                 }`}
               >
                 {isDueSoon && (
@@ -300,27 +315,36 @@ export function SubscriptionsView({
                       </CardDescription>
                     </div>
                     <Badge
-                      variant={sub.isActive ? (isDueSoon ? "default" : "secondary") : "outline"}
+                      variant={
+                        sub.isActive
+                          ? isDueSoon
+                            ? "default"
+                            : "secondary"
+                          : "outline"
+                      }
                       className={`text-[10px] ${
                         !sub.isActive
                           ? "text-zinc-400"
                           : isDueSoon
-                          ? "bg-amber-500 text-white hover:bg-amber-600"
-                          : ""
+                            ? "bg-amber-500 text-white hover:bg-amber-600"
+                            : ""
                       }`}
                     >
                       {!sub.isActive
                         ? "Dijeda"
                         : daysLeft === 0
-                        ? "Hari Ini"
-                        : `${daysLeft} hari lagi`}
+                          ? "Hari Ini"
+                          : `${daysLeft} hari lagi`}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
                     {formatCurrency(sub.amount, sub.currency)}
-                    <span className="text-xs font-normal text-zinc-400"> /bulan</span>
+                    <span className="text-xs font-normal text-zinc-400">
+                      {" "}
+                      /bulan
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
@@ -499,7 +523,10 @@ export function SubscriptionsView({
                   onChange={(e) => setEditActive(e.target.checked)}
                   className="rounded border-zinc-300"
                 />
-                <label htmlFor="isActive" className="text-xs text-zinc-700 dark:text-zinc-300">
+                <label
+                  htmlFor="isActive"
+                  className="text-xs text-zinc-700 dark:text-zinc-300"
+                >
                   Langganan Aktif (kirimkan reminder sebelum jatuh tempo)
                 </label>
               </div>
