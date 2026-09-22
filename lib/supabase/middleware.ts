@@ -48,7 +48,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // 2. Jika user BELUM login dan mencoba membuka halaman selain /login
-  if (!user && pathname !== "/login") {
+  if (!user && pathname !== "/login" && pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

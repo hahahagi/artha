@@ -17,6 +17,7 @@ import {
   Clock,
 } from "lucide-react";
 import Link from "next/link";
+import { LandingView } from "@/components/landing/landing-view";
 
 /**
  * Helper menghitung sisa hari menuju tanggal tagihan berikutnya
@@ -46,7 +47,7 @@ export default async function DashboardOverviewPage() {
   } = await supabase.auth.getUser();
 
   if (!user || !user.email) {
-    redirect("/login");
+    return <LandingView />;
   }
 
   // 1. Ambil data pengguna, pengeluaran, dan langganannya dari Prisma
@@ -79,7 +80,7 @@ export default async function DashboardOverviewPage() {
 
   const totalCurrentMonth = currentMonthExpenses.reduce(
     (sum, e) => (e.currency === "IDR" ? sum + e.amount : sum),
-    0
+    0,
   );
 
   // 3. Agregasi Data Grafik Tren
