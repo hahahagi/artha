@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateTelegramWebhook } from "@/lib/telegram/validate";
-import { sendTelegramMessage } from "@/lib/telegram/bot";
 import { TELEGRAM_MESSAGES } from "@/lib/telegram/messages";
 import { parseExpenseText } from "@/lib/parser/expense-parser";
 import { categorizeExpense } from "@/lib/parser/categorizer";
@@ -8,6 +7,11 @@ import { formatCurrency } from "@/lib/utils/format";
 import { prisma } from "@/lib/prisma";
 import { isRateLimited } from "@/lib/utils/rate-limit";
 import { parseSubscriptionText } from "@/lib/parser/subscription-parser";
+import {
+  sendTelegramMessage,
+  answerCallbackQuery,
+  editTelegramMessageText,
+} from "@/lib/telegram/bot";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +24,49 @@ export async function POST(req: NextRequest) {
 
     // 2. Baca payload update dari Telegram
     const body = await req.json();
+
+    // 3. Tangani Callback Query (Tombol Inline [↩️ Batalkan])
+    if (body.callback_query) {
+      const cq = body.callback_query;
+      const cqId = cq.id;
+      const data = cq.data as string;
+      const chatId = cq.message?.chat?.id;
+      const messageId = cq.message?.message_id;
+
+      if (data && data.startsWith("undo_")) {
+        const expenseId = data.replace("undo_", "");
+
+        try {
+          const expense = await prisma.expense.findUnique({
+            where: { id: expenseId },
+          });
+
+          if (expense) {
+            await prisma.expense.delete({
+              where: { id: expenseId },
+            });
+
+            await answerCallbackQuery(cqId, "Transaksi berhasil dibatalkan!");
+
+            if (chatId && messageId) {
+              await editTelegramMessageText(
+                chatId,
+                messageId,
+                `🗑️ <i>Transaksi <b>${expense.itemName}</b> (${formatCurrency(expense.amount, expense.currency)}) telah dibatalkan.</i>`,
+              );
+            }
+          } else {
+            await answerCallbackQuery(cqId, "Transaksi sudah tidak ditemukan.");
+          }
+        } catch (err) {
+          console.error("[Callback Undo Error]:", err);
+          await answerCallbackQuery(cqId, "Gagal membatalkan transaksi.");
+        }
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
     const message = body.message;
 
     // Abaikan jika bukan pesan teks
@@ -42,7 +89,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Tangani Pairing Akun Web <-> Telegram (/start link_TOKEN atau /link TOKEN)
+    // 4. Tangani Pairing Akun Web <-> Telegram (/start link_TOKEN atau /link TOKEN)
     const isStartLink = text.startsWith("/start link_");
     const isDirectLink = text.startsWith("/link ");
 
@@ -59,7 +106,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-      // Cari user di web yang memiliki linkToken aktif
       const webUser = await prisma.user.findFirst({
         where: {
           linkToken: token,
@@ -76,25 +122,21 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        // Cek apakah ada temporary user lain yang pernah terbuat dengan chatId ini
         const existingTelegramUser = await prisma.user.findUnique({
           where: { telegramChatId: BigInt(chatId) },
         });
 
         if (existingTelegramUser && existingTelegramUser.id !== webUser.id) {
-          // Pindahkan seluruh riwayat transaksi dari bot ke akun web
           await prisma.expense.updateMany({
             where: { userId: existingTelegramUser.id },
             data: { userId: webUser.id },
           });
 
-          // Hapus akun sementara bot
           await prisma.user.delete({
             where: { id: existingTelegramUser.id },
           });
         }
 
-        // Tautkan telegramChatId ke akun webUser
         await prisma.user.update({
           where: { id: webUser.id },
           data: {
@@ -120,7 +162,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // 3. Tangani Command /start
+    // 5. Tangani Command /start Biasa
     if (text === "/start") {
       try {
         await prisma.user.upsert({
@@ -139,13 +181,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // 4. Tangani Command /help
+    // 6. Tangani Command /help
     if (text === "/help") {
       await sendTelegramMessage(chatId, TELEGRAM_MESSAGES.help());
       return NextResponse.json({ ok: true });
     }
 
-    // 5. Tangani Command /sub (Manajemen Langganan Rutin)
+    // 7. Tangani Command /sub (Manajemen Langganan Rutin)
     if (text === "/sub" || text.startsWith("/sub ") || text === "/subs") {
       const subArgs = text.replace(/^\/subs?\s*/i, "").trim();
 
@@ -166,88 +208,6 @@ Gunakan format:
 Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
 `.trim();
         await sendTelegramMessage(chatId, helpText);
-        return NextResponse.json({ ok: true });
-      }
-
-      // 6. Tangani Command /rekap (Ringkasan Pengeluaran Mingguan / Bulanan)
-      if (text === "/rekap" || text.startsWith("/rekap ")) {
-        const rekapArg = text
-          .replace(/^\/rekap\s*/i, "")
-          .trim()
-          .toLowerCase();
-
-        // Pastikan user ada di database
-        const user = await prisma.user.upsert({
-          where: { telegramChatId: BigInt(chatId) },
-          update: { telegramUsername: username },
-          create: {
-            telegramChatId: BigInt(chatId),
-            telegramUsername: username,
-          },
-        });
-
-        const now = new Date();
-        let startDate: Date;
-        let periodName: string;
-
-        if (rekapArg === "minggu" || rekapArg === "mingguan") {
-          // 7 Hari Terakhir
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          periodName = "7 Hari Terakhir";
-        } else {
-          // Default: Bulan Ini
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          periodName = now.toLocaleDateString("id-ID", {
-            month: "long",
-            year: "numeric",
-          });
-        }
-
-        // Ambil transaksi pengguna pada periode tersebut
-        const expenses = await prisma.expense.findMany({
-          where: {
-            userId: user.id,
-            createdAt: { gte: startDate },
-          },
-          include: { category: true },
-          orderBy: { createdAt: "desc" },
-        });
-
-        if (expenses.length === 0) {
-          await sendTelegramMessage(
-            chatId,
-            TELEGRAM_MESSAGES.rekapEmpty(periodName),
-          );
-          return NextResponse.json({ ok: true });
-        }
-
-        // Hitung total pengeluaran (IDR)
-        const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-        // Hitung rincian per kategori
-        const categoryMap: Record<string, number> = {};
-        for (const e of expenses) {
-          const catName = e.category?.name || "Lainnya";
-          categoryMap[catName] = (categoryMap[catName] || 0) + e.amount;
-        }
-
-        const breakdown = Object.entries(categoryMap)
-          .map(([catName, amount]) => ({
-            name: catName,
-            amountFormatted: formatCurrency(amount, "IDR"),
-            percent:
-              totalAmount > 0 ? Math.round((amount / totalAmount) * 100) : 0,
-          }))
-          .sort((a, b) => b.percent - a.percent);
-
-        const msg = TELEGRAM_MESSAGES.rekapSummary({
-          periodName,
-          totalFormatted: formatCurrency(totalAmount, "IDR"),
-          count: expenses.length,
-          breakdown,
-        });
-
-        await sendTelegramMessage(chatId, msg);
         return NextResponse.json({ ok: true });
       }
 
@@ -347,26 +307,13 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
       return NextResponse.json({ ok: true });
     }
 
-    // 6. Tangani Perintah yang tidak dikenali (jika diawali '/')
-    if (text.startsWith("/")) {
-      await sendTelegramMessage(
-        chatId,
-        "⚠️ Perintah tidak dikenali. Ketik <b>/help</b> untuk melihat panduan yang tersedia.",
-      );
-      return NextResponse.json({ ok: true });
-    }
+    // 8. Tangani Command /rekap (Ringkasan Pengeluaran)
+    if (text === "/rekap" || text.startsWith("/rekap ")) {
+      const rekapArg = text
+        .replace(/^\/rekap\s*/i, "")
+        .trim()
+        .toLowerCase();
 
-    // 7. Alur Pencatatan Pengeluaran (Expense Recording Flow)
-    const parsed = parseExpenseText(text);
-
-    if (!parsed) {
-      // Teks bukan command dan tidak terbaca sebagai pengeluaran yang valid
-      await sendTelegramMessage(chatId, TELEGRAM_MESSAGES.parseFailed());
-      return NextResponse.json({ ok: true });
-    }
-
-    try {
-      // Pastikan user ada di DB
       const user = await prisma.user.upsert({
         where: { telegramChatId: BigInt(chatId) },
         update: { telegramUsername: username },
@@ -376,13 +323,135 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
         },
       });
 
-      // Deteksi kategori pengeluaran
+      const now = new Date();
+      let startDate: Date;
+      let periodName: string;
+
+      if (rekapArg === "minggu" || rekapArg === "mingguan") {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        periodName = "7 Hari Terakhir";
+      } else {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        periodName = now.toLocaleDateString("id-ID", {
+          month: "long",
+          year: "numeric",
+        });
+      }
+
+      const expenses = await prisma.expense.findMany({
+        where: {
+          userId: user.id,
+          createdAt: { gte: startDate },
+        },
+        include: { category: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (expenses.length === 0) {
+        await sendTelegramMessage(
+          chatId,
+          TELEGRAM_MESSAGES.rekapEmpty(periodName),
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+      const categoryMap: Record<string, number> = {};
+      for (const e of expenses) {
+        const catName = e.category?.name || "Lainnya";
+        categoryMap[catName] = (categoryMap[catName] || 0) + e.amount;
+      }
+
+      const breakdown = Object.entries(categoryMap)
+        .map(([catName, amount]) => ({
+          name: catName,
+          amountFormatted: formatCurrency(amount, "IDR"),
+          percent:
+            totalAmount > 0 ? Math.round((amount / totalAmount) * 100) : 0,
+        }))
+        .sort((a, b) => b.percent - a.percent);
+
+      const msg = TELEGRAM_MESSAGES.rekapSummary({
+        periodName,
+        totalFormatted: formatCurrency(totalAmount, "IDR"),
+        count: expenses.length,
+        breakdown,
+      });
+
+      await sendTelegramMessage(chatId, msg);
+      return NextResponse.json({ ok: true });
+    }
+
+    // 9. Tangani Command /batal (Membatalkan Transaksi Terakhir)
+    if (text === "/batal" || text.startsWith("/batal")) {
+      const user = await prisma.user.findUnique({
+        where: { telegramChatId: BigInt(chatId) },
+      });
+
+      if (!user) {
+        await sendTelegramMessage(chatId, TELEGRAM_MESSAGES.batalNotFound());
+        return NextResponse.json({ ok: true });
+      }
+
+      const lastExpense = await prisma.expense.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (!lastExpense) {
+        await sendTelegramMessage(chatId, TELEGRAM_MESSAGES.batalNotFound());
+        return NextResponse.json({ ok: true });
+      }
+
+      await prisma.expense.delete({
+        where: { id: lastExpense.id },
+      });
+
+      const formatted = formatCurrency(
+        lastExpense.amount,
+        lastExpense.currency,
+      );
+      await sendTelegramMessage(
+        chatId,
+        TELEGRAM_MESSAGES.batalSuccess(lastExpense.itemName, formatted),
+      );
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // 10. Tangani Perintah yang tidak dikenali (jika diawali '/')
+    if (text.startsWith("/")) {
+      await sendTelegramMessage(
+        chatId,
+        "⚠️ Perintah tidak dikenali. Ketik <b>/help</b> untuk melihat panduan yang tersedia.",
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // 11. Alur Pencatatan Pengeluaran (Expense Recording Flow)
+    const parsed = parseExpenseText(text);
+
+    if (!parsed) {
+      await sendTelegramMessage(chatId, TELEGRAM_MESSAGES.parseFailed());
+      return NextResponse.json({ ok: true });
+    }
+
+    try {
+      const user = await prisma.user.upsert({
+        where: { telegramChatId: BigInt(chatId) },
+        update: { telegramUsername: username },
+        create: {
+          telegramChatId: BigInt(chatId),
+          telegramUsername: username,
+        },
+      });
+
       const detectedCategory = categorizeExpense(parsed.itemName);
       const categoryDisplayName = detectedCategory ?? "Lainnya";
 
       let categoryId: string | null = null;
       if (detectedCategory) {
-        // Cari atau buat kategori untuk user ini
         const category = await prisma.category.upsert({
           where: {
             userId_name: {
@@ -400,8 +469,7 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
         categoryId = category.id;
       }
 
-      // Simpan catatan transaksi pengeluaran
-      await prisma.expense.create({
+      const createdExpense = await prisma.expense.create({
         data: {
           userId: user.id,
           itemName: parsed.itemName,
@@ -413,16 +481,26 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
         },
       });
 
-      // Kirim notifikasi konfirmasi sukses ke chat Telegram
       const amountFormatted = formatCurrency(parsed.amount, parsed.currency);
-      await sendTelegramMessage(
-        chatId,
-        TELEGRAM_MESSAGES.expenseRecorded({
-          itemName: parsed.itemName,
-          amountFormatted,
-          categoryName: categoryDisplayName,
-        }),
-      );
+      const confirmationMsg = TELEGRAM_MESSAGES.expenseRecorded({
+        itemName: parsed.itemName,
+        amountFormatted,
+        categoryName: categoryDisplayName,
+      });
+
+      // Kirim konfirmasi dengan tombol inline [↩️ Batalkan]
+      await sendTelegramMessage(chatId, confirmationMsg, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "↩️ Batalkan",
+                callback_data: `undo_${createdExpense.id}`,
+              },
+            ],
+          ],
+        },
+      });
     } catch (dbError) {
       console.error("[Webhook] Gagal menyimpan transaksi ke DB:", dbError);
       await sendTelegramMessage(

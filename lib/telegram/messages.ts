@@ -97,4 +97,17 @@ ${breakdownText}
 💡 <i>Gunakan <b>/rekap minggu</b> untuk 7 hari terakhir atau <b>/rekap bulan</b> untuk bulan ini.</i>
 `.trim();
   },
+
+  batalSuccess: (itemName: string, amountFormatted: string) =>
+    `
+🗑️ <b>Transaksi Berhasil Dibatalkan!</b>
+
+Catatan pengeluaran berikut telah dihapus:
+• <b>${itemName}</b>: ${amountFormatted}
+`.trim(),
+
+  batalNotFound: () =>
+    `
+⚠️ <b>Tidak ada transaksi yang bisa dibatalkan.</b>
+`.trim(),
 };
