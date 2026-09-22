@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { seedUserDefaultCategories } from "@/lib/db/seed-categories";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -16,13 +17,15 @@ export async function GET(request: Request) {
       const email = data.user.email;
       if (email) {
         try {
-          await prisma.user.upsert({
+          const dbUser = await prisma.user.upsert({
             where: { email },
             update: {},
             create: {
               email,
             },
           });
+          // Otomatis buatkan 6 kategori default untuk user baru
+          await seedUserDefaultCategories(dbUser.id);
         } catch (dbErr) {
           console.error("[Auth Callback] DB Upsert error:", dbErr);
         }
