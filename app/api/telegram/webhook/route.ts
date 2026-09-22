@@ -169,6 +169,88 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
         return NextResponse.json({ ok: true });
       }
 
+      // 6. Tangani Command /rekap (Ringkasan Pengeluaran Mingguan / Bulanan)
+      if (text === "/rekap" || text.startsWith("/rekap ")) {
+        const rekapArg = text
+          .replace(/^\/rekap\s*/i, "")
+          .trim()
+          .toLowerCase();
+
+        // Pastikan user ada di database
+        const user = await prisma.user.upsert({
+          where: { telegramChatId: BigInt(chatId) },
+          update: { telegramUsername: username },
+          create: {
+            telegramChatId: BigInt(chatId),
+            telegramUsername: username,
+          },
+        });
+
+        const now = new Date();
+        let startDate: Date;
+        let periodName: string;
+
+        if (rekapArg === "minggu" || rekapArg === "mingguan") {
+          // 7 Hari Terakhir
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          periodName = "7 Hari Terakhir";
+        } else {
+          // Default: Bulan Ini
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          periodName = now.toLocaleDateString("id-ID", {
+            month: "long",
+            year: "numeric",
+          });
+        }
+
+        // Ambil transaksi pengguna pada periode tersebut
+        const expenses = await prisma.expense.findMany({
+          where: {
+            userId: user.id,
+            createdAt: { gte: startDate },
+          },
+          include: { category: true },
+          orderBy: { createdAt: "desc" },
+        });
+
+        if (expenses.length === 0) {
+          await sendTelegramMessage(
+            chatId,
+            TELEGRAM_MESSAGES.rekapEmpty(periodName),
+          );
+          return NextResponse.json({ ok: true });
+        }
+
+        // Hitung total pengeluaran (IDR)
+        const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+        // Hitung rincian per kategori
+        const categoryMap: Record<string, number> = {};
+        for (const e of expenses) {
+          const catName = e.category?.name || "Lainnya";
+          categoryMap[catName] = (categoryMap[catName] || 0) + e.amount;
+        }
+
+        const breakdown = Object.entries(categoryMap)
+          .map(([catName, amount]) => ({
+            name: catName,
+            amountFormatted: formatCurrency(amount, "IDR"),
+            percent:
+              totalAmount > 0 ? Math.round((amount / totalAmount) * 100) : 0,
+          }))
+          .sort((a, b) => b.percent - a.percent);
+
+        const msg = TELEGRAM_MESSAGES.rekapSummary({
+          periodName,
+          totalFormatted: formatCurrency(totalAmount, "IDR"),
+          count: expenses.length,
+          breakdown,
+        });
+
+        await sendTelegramMessage(chatId, msg);
+        return NextResponse.json({ ok: true });
+      }
+
       // Pastikan user ada di database
       const user = await prisma.user.upsert({
         where: { telegramChatId: BigInt(chatId) },

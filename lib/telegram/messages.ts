@@ -1,5 +1,6 @@
 export const TELEGRAM_MESSAGES = {
-  welcome: (username?: string) => `
+  welcome: (username?: string) =>
+    `
 👋 <b>Halo ${username ? `@${username}` : "Kak"}! Selamat datang di Artha.</b>
 
 Artha siap mencatat pengeluaran harianmu tanpa ribet. Cukup ketik langsung apa yang kamu beli:
@@ -13,7 +14,8 @@ Kategori dan nominal akan otomatis dideteksi! ✨
 Ketik <b>/help</b> untuk melihat panduan lengkap.
 `.trim(),
 
-  help: () => `
+  help: () =>
+    `
 📖 <b>Panduan Penggunaan Artha</b>
 
 1. <b>Catat Pengeluaran:</b>
@@ -39,7 +41,8 @@ Ketik <b>/help</b> untuk melihat panduan lengkap.
     itemName: string;
     amountFormatted: string;
     categoryName: string;
-  }) => `
+  }) =>
+    `
 ✅ <b>Pengeluaran Berhasil Dicatat!</b>
 
 📝 <b>Item:</b> ${data.itemName}
@@ -47,10 +50,51 @@ Ketik <b>/help</b> untuk melihat panduan lengkap.
 🏷️ <b>Kategori:</b> ${data.categoryName}
 `.trim(),
 
-  parseFailed: () => `
+  parseFailed: () =>
+    `
 ⚠️ <b>Format tidak dikenali</b>
 
 Pastikan memasukkan nama barang dan nominal harga.
 Contoh: <code>kopi 25k</code> atau <code>bensin 30.000</code>
 `.trim(),
+
+  rekapEmpty: (periodName: string) =>
+    `
+📭 <b>Belum Ada Pengeluaran</b>
+
+Tidak ada catatan pengeluaran pada <b>${periodName}</b>.
+Ketik pengeluaran barumu, contoh: <code>kopi 25k</code>
+`.trim(),
+
+  rekapSummary: (data: {
+    periodName: string;
+    totalFormatted: string;
+    count: number;
+    breakdown: Array<{
+      name: string;
+      amountFormatted: string;
+      percent: number;
+    }>;
+  }) => {
+    const breakdownText =
+      data.breakdown.length > 0
+        ? data.breakdown
+            .map(
+              (b) => `• <b>${b.name}:</b> ${b.amountFormatted} (${b.percent}%)`,
+            )
+            .join("\n")
+        : "• <i>Tanpa kategori khusus</i>";
+
+    return `
+📊 <b>Rekap Pengeluaran (${data.periodName})</b>
+
+💰 <b>Total Pengeluaran:</b> ${data.totalFormatted}
+🧾 <b>Total Transaksi:</b> ${data.count} transaksi
+
+<b>Rincian per Kategori:</b>
+${breakdownText}
+
+💡 <i>Gunakan <b>/rekap minggu</b> untuk 7 hari terakhir atau <b>/rekap bulan</b> untuk bulan ini.</i>
+`.trim();
+  },
 };
