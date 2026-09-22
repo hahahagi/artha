@@ -78,7 +78,7 @@ export function categorizeExpense(
       // Escape karakter khusus regex jika ada
       const escapedKw = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       // \b cocok untuk mencocokkan batas kata utuh atau frasa
-      const regex = new RegExp(`\\b${escapedKw}\\b`, "i");
+      const regex = new RegExp(`(?<!\\w)${escapedKw}(?!\\w)`, "i");
 
       if (regex.test(text)) {
         return rule.name;
