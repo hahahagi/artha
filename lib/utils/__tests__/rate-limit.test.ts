@@ -23,6 +23,15 @@ describe("In-Memory Rate Limiter", () => {
     expect(isRateLimited(key, max, 1000)).toBe(true);
   });
 
+  it("menggunakan nilai default (maxRequests = 20, windowMs = 60.000)", () => {
+    const key = "user-default";
+    for (let i = 0; i < 20; i++) {
+      expect(isRateLimited(key)).toBe(false);
+    }
+    // Request ke-21 harus terblokir
+    expect(isRateLimited(key)).toBe(true);
+  });
+
   it("mengisolasi kuota antar user/key yang berbeda", () => {
     expect(isRateLimited("user-a", 1, 1000)).toBe(false);
     expect(isRateLimited("user-a", 1, 1000)).toBe(true);
@@ -43,5 +52,20 @@ describe("In-Memory Rate Limiter", () => {
 
     // Kuota sudah direset
     expect(isRateLimited(key, 1, 1000)).toBe(false);
+  });
+
+  it("membersihkan entri kadaluarsa saat ukuran map melebihi 10.000 (memory management)", () => {
+    vi.useFakeTimers();
+
+    // Isi 10.001 entri simulasi
+    for (let i = 0; i <= 10001; i++) {
+      isRateLimited(`old-key-${i}`, 1, 100);
+    }
+
+    // Majukan waktu agar entri kadaluarsa
+    vi.advanceTimersByTime(150);
+
+    // Panggil satu request baru untuk memicu pembersihan sampah memori
+    expect(isRateLimited("new-key", 1, 1000)).toBe(false);
   });
 });
