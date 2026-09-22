@@ -1,0 +1,17 @@
+name: Reminder Cron Fallback
+
+on:
+  schedule:
+    # Berjalan setiap hari pukul 01:00 UTC (08:00 WIB)
+    - cron: "0 1 * * *"
+  # Memungkinkan pemicu manual kapan saja via tombol di tab GitHub Actions
+  workflow_dispatch:
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Reminder Cron Endpoint
+        run: |
+          curl -f -s -S -X POST "${{ secrets.APP_URL }}/api/cron/reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
