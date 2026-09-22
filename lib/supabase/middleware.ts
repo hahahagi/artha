@@ -40,6 +40,7 @@ export async function updateSession(request: NextRequest) {
   if (
     pathname.startsWith("/api/telegram") ||
     pathname.startsWith("/api/cron") ||
+    pathname.startsWith("/api/health") ||
     pathname.startsWith("/callback") ||
     pathname.endsWith(".webmanifest") ||
     pathname === "/manifest.json"
