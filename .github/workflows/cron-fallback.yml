@@ -15,3 +15,14 @@ jobs:
         run: |
           curl -f -s -S -X POST "${{ secrets.APP_URL }}/api/cron/reminders" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      - name: Trigger Weekly Digest on Mondays
+        run: |
+          # Jalankan hanya jika hari ini hari Senin (1)
+          if [ "$(date +%u)" = "1" ]; then
+            echo "Hari Senin terdeteksi. Memproses Smart Weekly Digest..."
+            curl -f -s -S -X POST "${{ secrets.APP_URL }}/api/cron/digest" \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          else
+            echo "Bukan hari Senin, lewati digest."
+          fi
