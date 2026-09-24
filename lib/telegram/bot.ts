@@ -11,7 +11,7 @@ export interface SendMessageOptions {
 export async function sendTelegramMessage(
   chatId: number | string | bigint,
   text: string,
-  options?: SendMessageOptions
+  options?: SendMessageOptions,
 ) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
@@ -35,7 +35,7 @@ export async function sendTelegramMessage(
   if (!response.ok || !data.ok) {
     console.error("Telegram API Error:", data);
     throw new Error(
-      `Gagal mengirim pesan Telegram: ${data.description || "Unknown error"}`
+      `Gagal mengirim pesan Telegram: ${data.description || "Unknown error"}`,
     );
   }
 
@@ -58,7 +58,10 @@ export async function getBotMe() {
 /**
  * Merespons tombol interaktif Telegram (menghilangkan loading icon pada tombol)
  */
-export async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+export async function answerCallbackQuery(
+  callbackQueryId: string,
+  text?: string,
+) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
 
@@ -73,12 +76,13 @@ export async function answerCallbackQuery(callbackQueryId: string, text?: string
 }
 
 /**
- * Mengubah isi pesan teks Telegram yang sudah terkirim sebelumnya
+ * Mengubah isi pesan teks Telegram yang sudah terkirim sebelumnya (bisa menyertakan tombol baru)
  */
 export async function editTelegramMessageText(
   chatId: number | string | bigint,
   messageId: number,
-  text: string
+  text: string,
+  options?: { reply_markup?: unknown; parse_mode?: "HTML" | "Markdown" },
 ) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
@@ -90,7 +94,30 @@ export async function editTelegramMessageText(
       chat_id: typeof chatId === "bigint" ? chatId.toString() : chatId,
       message_id: messageId,
       text,
-      parse_mode: "HTML",
+      parse_mode: options?.parse_mode ?? "HTML",
+      reply_markup: options?.reply_markup,
+    }),
+  });
+}
+
+/**
+ * Mengubah tombol inline keyboard saja tanpa mengubah teks pesan
+ */
+export async function editTelegramMessageReplyMarkup(
+  chatId: number | string | bigint,
+  messageId: number,
+  replyMarkup?: unknown,
+) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+
+  await fetch(`${TELEGRAM_API_BASE}/bot${token}/editMessageReplyMarkup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: typeof chatId === "bigint" ? chatId.toString() : chatId,
+      message_id: messageId,
+      reply_markup: replyMarkup,
     }),
   });
 }

@@ -11,6 +11,7 @@ import {
   sendTelegramMessage,
   answerCallbackQuery,
   editTelegramMessageText,
+  editTelegramMessageReplyMarkup,
 } from "@/lib/telegram/bot";
 
 export async function POST(req: NextRequest) {
@@ -62,6 +63,159 @@ export async function POST(req: NextRequest) {
           console.error("[Callback Undo Error]:", err);
           await answerCallbackQuery(cqId, "Gagal membatalkan transaksi.");
         }
+      }
+
+      // 3.1. Handler Klik Tombol [🏷️ Ubah Kategori]
+      if (data && data.startsWith("pickcat_")) {
+        const expenseId = data.replace("pickcat_", "");
+
+        try {
+          const expense = await prisma.expense.findUnique({
+            where: { id: expenseId },
+            include: { user: true },
+          });
+
+          if (!expense) {
+            await answerCallbackQuery(cqId, "Transaksi tidak ditemukan.");
+            return NextResponse.json({ ok: true });
+          }
+
+          // Ambil seluruh kategori milik pengguna
+          const categories = await prisma.category.findMany({
+            where: { userId: expense.userId },
+            orderBy: { name: "asc" },
+          });
+
+          if (categories.length === 0) {
+            await answerCallbackQuery(cqId, "Belum ada kategori tersedia.");
+            return NextResponse.json({ ok: true });
+          }
+
+          // Susun tombol inline 2 kolom
+          const inline_keyboard: Array<
+            Array<{ text: string; callback_data: string }>
+          > = [];
+          for (let i = 0; i < categories.length; i += 2) {
+            const row = [
+              {
+                text: categories[i].name,
+                callback_data: `c_${expenseId}_${categories[i].id}`,
+              },
+            ];
+            if (categories[i + 1]) {
+              row.push({
+                text: categories[i + 1].name,
+                callback_data: `c_${expenseId}_${categories[i + 1].id}`,
+              });
+            }
+            inline_keyboard.push(row);
+          }
+
+          // Tambahkan tombol batal / selesai di baris terakhir
+          inline_keyboard.push([
+            {
+              text: "⬅️ Batal Ubah",
+              callback_data: `closecat_${expenseId}`,
+            },
+          ]);
+
+          await answerCallbackQuery(cqId);
+
+          if (chatId && messageId) {
+            await editTelegramMessageReplyMarkup(chatId, messageId, {
+              inline_keyboard,
+            });
+          }
+        } catch (err) {
+          console.error("[Callback Pick Category Error]:", err);
+          await answerCallbackQuery(cqId, "Gagal memuat kategori.");
+        }
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // 3.2. Handler Pemilihan Kategori Baru
+      if (data && data.startsWith("c_")) {
+        const [, expenseId, categoryId] = data.split("_");
+
+        try {
+          const updatedExpense = await prisma.expense.update({
+            where: { id: expenseId },
+            data: { categoryId },
+            include: { category: true },
+          });
+
+          await answerCallbackQuery(
+            cqId,
+            `Kategori diubah ke ${updatedExpense.category?.name || "Lainnya"}!`,
+          );
+
+          if (chatId && messageId) {
+            const formattedAmount = formatCurrency(
+              updatedExpense.amount,
+              updatedExpense.currency,
+            );
+            const newConfirmationMsg = TELEGRAM_MESSAGES.expenseRecorded({
+              itemName: updatedExpense.itemName,
+              amountFormatted: formattedAmount,
+              categoryName: updatedExpense.category?.name ?? "Lainnya",
+            });
+
+            // Kembalikan tombol awal
+            await editTelegramMessageText(
+              chatId,
+              messageId,
+              newConfirmationMsg,
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [
+                      {
+                        text: "🏷️ Ubah Kategori",
+                        callback_data: `pickcat_${expenseId}`,
+                      },
+                      {
+                        text: "↩️ Batalkan",
+                        callback_data: `undo_${expenseId}`,
+                      },
+                    ],
+                  ],
+                },
+              },
+            );
+          }
+        } catch (err) {
+          console.error("[Callback Set Category Error]:", err);
+          await answerCallbackQuery(cqId, "Gagal mengubah kategori.");
+        }
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // 3.3. Handler Tombol [⬅️ Batal Ubah]
+      if (data && data.startsWith("closecat_")) {
+        const expenseId = data.replace("closecat_", "");
+        await answerCallbackQuery(cqId);
+
+        if (chatId && messageId) {
+          // Kembalikan ke tombol awal
+          await editTelegramMessageReplyMarkup(chatId, messageId, {
+            inline_keyboard: [
+              [
+                {
+                  text: "🏷️ Ubah Kategori",
+                  callback_data: `pickcat_${expenseId}`,
+                },
+                {
+                  text: "↩️ Batalkan",
+                  callback_data: `undo_${expenseId}`,
+                },
+              ],
+            ],
+          });
+        }
+
+        return NextResponse.json({ ok: true });
       }
 
       return NextResponse.json({ ok: true });
@@ -489,10 +643,15 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
       });
 
       // Kirim konfirmasi dengan tombol inline [↩️ Batalkan]
+      // Kirim konfirmasi dengan tombol inline [🏷️ Ubah Kategori] & [↩️ Batalkan]
       await sendTelegramMessage(chatId, confirmationMsg, {
         reply_markup: {
           inline_keyboard: [
             [
+              {
+                text: "🏷️ Ubah Kategori",
+                callback_data: `pickcat_${createdExpense.id}`,
+              },
               {
                 text: "↩️ Batalkan",
                 callback_data: `undo_${createdExpense.id}`,
