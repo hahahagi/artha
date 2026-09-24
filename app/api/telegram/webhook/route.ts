@@ -13,6 +13,10 @@ import {
   editTelegramMessageText,
   editTelegramMessageReplyMarkup,
 } from "@/lib/telegram/bot";
+import {
+  downloadTelegramFile,
+  transcribeVoiceNote,
+} from "@/lib/telegram/voice";
 
 export async function POST(req: NextRequest) {
   try {
@@ -321,13 +325,12 @@ export async function POST(req: NextRequest) {
 
     const message = body.message;
 
-    // Abaikan jika bukan pesan teks
-    if (!message || !message.text) {
+    // Abaikan jika bukan pesan teks maupun pesan suara
+    if (!message || (!message.text && !message.voice)) {
       return NextResponse.json({ ok: true });
     }
 
     const chatId = message.chat.id;
-    const text = message.text.trim();
     const username =
       message.from?.username || message.from?.first_name || "User";
 
@@ -339,6 +342,44 @@ export async function POST(req: NextRequest) {
         "⏳ <b>Terlalu banyak pesan.</b> Mohon tunggu sebentar sebelum mengirim pesan lagi.",
       );
       return NextResponse.json({ ok: true });
+    }
+
+    let text = message.text ? message.text.trim() : "";
+    let isVoice = false;
+
+    // Tangani Pesan Suara (Voice Note) via Wit.ai
+    if (message.voice) {
+      const witToken = process.env.WIT_AI_TOKEN;
+      if (!witToken) {
+        await sendTelegramMessage(
+          chatId,
+          "🎤 <b>Pesan Suara Diterima</b>\n\nFitur transkripsi suara belum aktif karena token Wit.ai (<code>WIT_AI_TOKEN</code>) belum dikonfigurasi di server. Silakan ketik pengeluaran dengan teks.",
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      try {
+        const audioBuffer = await downloadTelegramFile(message.voice.file_id);
+        const transcribed = await transcribeVoiceNote(audioBuffer, witToken);
+
+        if (!transcribed) {
+          await sendTelegramMessage(
+            chatId,
+            "⚠️ Maaf, suara tidak dapat dikenali dengan jelas. Silakan coba bicara lebih dekat atau ketik pengeluaranmu.",
+          );
+          return NextResponse.json({ ok: true });
+        }
+
+        text = transcribed;
+        isVoice = true;
+      } catch (voiceErr) {
+        console.error("[Webhook Voice Transcription Error]:", voiceErr);
+        await sendTelegramMessage(
+          chatId,
+          "⚠️ Gagal memproses pesan suara. Silakan coba lagi atau gunakan teks.",
+        );
+        return NextResponse.json({ ok: true });
+      }
     }
 
     // 4. Tangani Pairing Akun Web <-> Telegram (/start link_TOKEN atau /link TOKEN)
@@ -815,7 +856,7 @@ Apakah ini pengeluaran yang ingin Anda catat?
               count: parsed.splitCount,
             }
           : undefined;
-      const confirmationMsg = TELEGRAM_MESSAGES.expenseRecorded({
+      let confirmationMsg = TELEGRAM_MESSAGES.expenseRecorded({
         itemName: parsed.itemName,
         amountFormatted,
         categoryName: categoryDisplayName,
@@ -823,6 +864,10 @@ Apakah ini pengeluaran yang ingin Anda catat?
         warning: budgetWarning,
         splitInfo,
       });
+
+      if (isVoice) {
+        confirmationMsg = `🎤 <i>Terdengar: "${text}"</i>\n\n${confirmationMsg}`;
+      }
 
       // Kirim konfirmasi dengan tombol inline [↩️ Batalkan]
       // Kirim konfirmasi dengan tombol inline [🏷️ Ubah Kategori] & [↩️ Batalkan]
