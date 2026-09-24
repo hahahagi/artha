@@ -26,6 +26,7 @@ import {
   Plus,
   X,
   Receipt,
+  Download,
 } from "lucide-react";
 
 interface Category {
@@ -216,11 +217,25 @@ export function ExpensesTable({
           </div>
         </div>
 
-        {/* Tombol Catat Transaksi Baru */}
-        <Button onClick={() => setIsAddOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          <span>Tambah Pengeluaran</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Tombol Export CSV */}
+          <Button
+            variant="outline"
+            onClick={() => window.open("/api/export/expenses", "_blank")}
+            className="gap-2 rounded-xl text-xs font-medium"
+          >
+            <Download className="h-4 w-4" />
+            <span>Export CSV</span>
+          </Button>
+          {/* Tombol Catat Transaksi Baru */}
+          <Button
+            onClick={() => setIsAddOpen(true)}
+            className="gap-2 rounded-xl text-xs font-semibold"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Tambah Pengeluaran</span>
+          </Button>
+        </div>
       </div>
 
       {/* Tabel Transaksi */}
