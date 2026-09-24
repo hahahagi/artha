@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateTelegramWebhook } from "@/lib/telegram/validate";
 import { TELEGRAM_MESSAGES } from "@/lib/telegram/messages";
-import { parseExpenseText } from "@/lib/parser/expense-parser";
+import {
+  fuzzyParseExpense,
+} from "@/lib/parser/expense-parser";
 import { categorizeExpense } from "@/lib/parser/categorizer";
 import { formatCurrency } from "@/lib/utils/format";
 import { prisma } from "@/lib/prisma";
@@ -213,6 +215,104 @@ export async function POST(req: NextRequest) {
               ],
             ],
           });
+        }
+
+        // 3.4. Handler Konfirmasi Ambiguitas Parser [✅ Ya, Catat]
+        if (data && data.startsWith("conf_yes_")) {
+          // Format callback: conf_yes_{amount}_{itemSlug}
+          const parts = data.split("_");
+          const amount = parseInt(parts[2], 10);
+          const itemName =
+            decodeURIComponent(parts.slice(3).join("_")) || "Pengeluaran";
+
+          try {
+            if (!chatId) {
+              await answerCallbackQuery(cqId, "Gagal memproses.");
+              return NextResponse.json({ ok: true });
+            }
+
+            const dbUser = await prisma.user.findUnique({
+              where: { telegramChatId: BigInt(chatId) },
+            });
+
+            if (!dbUser) {
+              await answerCallbackQuery(cqId, "Pengguna belum terdaftar.");
+              return NextResponse.json({ ok: true });
+            }
+
+            // Ambil kategori user
+            const userCategories = await prisma.category.findMany({
+              where: { userId: dbUser.id },
+            });
+            const categoryRules = userCategories.map((c) => ({
+              name: c.name,
+              keywords: c.keywords,
+            }));
+
+            const detectedCategory = categorizeExpense(itemName, categoryRules);
+            const categoryDisplayName = detectedCategory ?? "Lainnya";
+
+            let categoryId: string | undefined;
+            if (detectedCategory) {
+              const matched = userCategories.find(
+                (c) => c.name === detectedCategory,
+              );
+              categoryId = matched?.id;
+            }
+
+            const createdExpense = await prisma.expense.create({
+              data: {
+                userId: dbUser.id,
+                itemName,
+                amount,
+                currency: dbUser.defaultCurrency,
+                categoryId,
+                rawText: `(Konfirmasi) ${itemName} ${amount}`,
+                source: "TELEGRAM",
+              },
+            });
+
+            await answerCallbackQuery(cqId, "Pengeluaran berhasil dicatat!");
+
+            if (chatId && messageId) {
+              const amountFormatted = formatCurrency(
+                amount,
+                dbUser.defaultCurrency,
+              );
+              const confirmationMsg = TELEGRAM_MESSAGES.expenseRecorded({
+                itemName,
+                amountFormatted,
+                categoryName: categoryDisplayName,
+              });
+
+              await editTelegramMessageText(
+                chatId,
+                messageId,
+                confirmationMsg,
+                {
+                  reply_markup: {
+                    inline_keyboard: [
+                      [
+                        {
+                          text: "🏷️ Ubah Kategori",
+                          callback_data: `pickcat_${createdExpense.id}`,
+                        },
+                        {
+                          text: "↩️ Batalkan",
+                          callback_data: `undo_${createdExpense.id}`,
+                        },
+                      ],
+                    ],
+                  },
+                },
+              );
+            }
+          } catch (err) {
+            console.error("[Callback Confirm Yes Error]:", err);
+            await answerCallbackQuery(cqId, "Gagal mencatat transaksi.");
+          }
+
+          return NextResponse.json({ ok: true });
         }
 
         return NextResponse.json({ ok: true });
@@ -583,11 +683,45 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
       return NextResponse.json({ ok: true });
     }
 
-    // 11. Alur Pencatatan Pengeluaran (Expense Recording Flow)
-    const parsed = parseExpenseText(text);
+    // 11. Alur Pencatatan Pengeluaran dengan Ambiguity Fallback
+    const fuzzy = fuzzyParseExpense(text);
 
-    if (!parsed) {
+    if (fuzzy.confidence === "none" || !fuzzy.parsed) {
       await sendTelegramMessage(chatId, TELEGRAM_MESSAGES.parseFailed());
+      return NextResponse.json({ ok: true });
+    }
+
+    const parsed = fuzzy.parsed;
+
+    // Jika ambigu (low confidence), tanyakan balik kepada user dengan tombol
+    if (fuzzy.confidence === "low") {
+      const amountFormatted = formatCurrency(parsed.amount, parsed.currency);
+      const itemSlug = encodeURIComponent(parsed.itemName).slice(0, 30);
+      const askMsg = `
+🤔 <b>Konfirmasi Pengeluaran</b>
+
+Saya mendeteksi nominal <b>${amountFormatted}</b> untuk catatan:
+<i>"${parsed.itemName}"</i>
+
+Apakah ini pengeluaran yang ingin Anda catat?
+`.trim();
+
+      await sendTelegramMessage(chatId, askMsg, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "✅ Ya, Catat",
+                callback_data: `conf_yes_${parsed.amount}_${itemSlug}`,
+              },
+              {
+                text: "❌ Bukan",
+                callback_data: "conf_no",
+              },
+            ],
+          ],
+        },
+      });
       return NextResponse.json({ ok: true });
     }
 

@@ -111,3 +111,93 @@ export function parseExpenseText(
     wallet,
   };
 }
+
+export interface FuzzyParseResult {
+  confidence: "high" | "low" | "none";
+  parsed: ParsedExpense | null;
+  reason?: string;
+}
+
+// Daftar kata kerja umum yang ambigu jika berdiri sendiri tanpa nama barang
+const GENERIC_VERBS = new Set(["beli", "bayar", "keluar", "habis", "belanja"]);
+
+/**
+ * Menganalisis teks dengan tingkat keyakinan (confidence level)
+ */
+export function fuzzyParseExpense(
+  text: string,
+  defaultCurrency = "IDR"
+): FuzzyParseResult {
+  if (!text || typeof text !== "string") {
+    return { confidence: "none", parsed: null };
+  }
+
+  const trimmed = text.trim();
+
+  // 1. Cek apakah ada digit angka sama sekali
+  if (!/\d/.test(trimmed)) {
+    return { confidence: "none", parsed: null };
+  }
+
+  // 2. Coba parse menggunakan parser standar
+  const parsed = parseExpenseText(trimmed, defaultCurrency);
+
+  // Jika berhasil di-parse:
+  if (parsed) {
+    const itemLower = parsed.itemName.toLowerCase().trim();
+
+    // A. Jika nominal berupa angka polos sangat kecil untuk rupiah (misal user ketik "kopi 25" -> Rp 25)
+    if (parsed.currency === "IDR" && parsed.amount > 0 && parsed.amount < 500) {
+      return {
+        confidence: "low",
+        parsed,
+        reason: "nominal_too_small",
+      };
+    }
+
+    // B. Jika nama item hanya kata kerja umum (misal "beli 50k", "bayar 100k")
+    if (GENERIC_VERBS.has(itemLower)) {
+      return {
+        confidence: "low",
+        parsed,
+        reason: "generic_verb",
+      };
+    }
+
+    // Format sangat jelas dan valid
+    return {
+      confidence: "high",
+      parsed,
+    };
+  }
+
+  // 3. Fallback jika parser standar gagal (misal user hanya mengetik "50k", "Rp 100.000", tanpa nama barang)
+  const amountRegex =
+    /(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(k|rb|ribu|jt|juta)?\b/i;
+  const match = trimmed.match(amountRegex);
+
+  if (match) {
+    const numStr = match[1].replace(/\./g, "").replace(",", ".");
+    const rawNum = parseFloat(numStr);
+    const unit = match[2]?.toLowerCase();
+
+    let multiplier = 1;
+    if (unit === "k" || unit === "rb" || unit === "ribu") multiplier = 1_000;
+    if (unit === "jt" || unit === "juta") multiplier = 1_000_000;
+
+    const totalAmount = Math.round(rawNum * multiplier);
+    if (!isNaN(totalAmount) && totalAmount > 0) {
+      return {
+        confidence: "low",
+        parsed: {
+          itemName: "Pengeluaran",
+          amount: totalAmount,
+          currency: defaultCurrency,
+        },
+        reason: "missing_item_name",
+      };
+    }
+  }
+
+  return { confidence: "none", parsed: null };
+}
