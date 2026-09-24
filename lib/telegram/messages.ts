@@ -43,12 +43,16 @@ Ketik <b>/help</b> untuk melihat panduan lengkap.
     categoryName: string;
     walletName?: string;
     warning?: string;
+    splitInfo?: {
+      originalFormatted: string;
+      count: number;
+    };
   }) =>
     `
 ✅ <b>Pengeluaran Berhasil Dicatat!</b>
 
 📝 <b>Item:</b> ${data.itemName}
-💰 <b>Nominal:</b> ${data.amountFormatted}
+${data.splitInfo ? `🧾 <b>Total Tagihan:</b> ${data.splitInfo.originalFormatted} ÷ ${data.splitInfo.count} orang\n` : ""}💰 <b>Nominal${data.splitInfo ? " (Porsi Kamu)" : ""}:</b> ${data.amountFormatted}
 🏷️ <b>Kategori:</b> ${data.categoryName}${data.walletName ? `\n💳 <b>Sumber:</b> ${data.walletName}` : ""}${data.warning || ""}
 `.trim(),
 

@@ -5,6 +5,8 @@ export interface ParsedExpense {
   amount: number;
   currency: string;
   wallet?: string;
+  splitCount?: number;
+  originalAmount?: number;
 }
 
 // Peta konversi simbol dan kata mata uang ke kode ISO 4217
@@ -86,17 +88,33 @@ export function parseExpenseText(
   const totalAmount = Math.round(rawNum * multiplier * qty);
   if (isNaN(totalAmount) || totalAmount <= 0) return null;
 
-  // 4. Bersihkan Teks untuk Menghasilkan Nama Item
+  // 4. Deteksi Pola Split Bill (contoh: bagi 3, dibagi 4, split 2, /3, patungan 5 orang)
   let itemName = workingText.replace(fullAmountMatchStr, " ");
   itemName = itemName.replace(currencyRegex, " ");
+
+  const splitRegex =
+    /(?:\b(?:bagi|dibagi|split|patungan)\s+(\d+)(?:\s*orang)?|\s*\/\s*(\d+)(?:\s*orang)?)\b/i;
+  const splitMatch = itemName.match(splitRegex);
+  let splitCount: number | undefined;
+  let originalAmount: number | undefined;
+  let finalAmount = totalAmount;
+
+  if (splitMatch) {
+    const count = parseInt(splitMatch[1] || splitMatch[2], 10);
+    if (!isNaN(count) && count > 1) {
+      splitCount = count;
+      originalAmount = totalAmount;
+      finalAmount = Math.ceil(totalAmount / count);
+      // Hapus pola split dari nama item
+      itemName = itemName.replace(splitMatch[0], " ");
+    }
+  }
+
   itemName = itemName
     .replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, "") // Hapus dash/tanda baca di awal/akhir
     .replace(/\s+/g, " ") // Rapikan multiple spasi
     .trim();
 
-  // Jika nama barang kosong atau hanya simbol, reject
-  // Jika nama barang kosong atau hanya simbol, reject
-  if (!itemName) return null;
   // 5. Deteksi Sumber Dana / Wallet (contoh: bca, gopay, tunai, ovo, dll)
   let wallet: string | undefined;
   const walletResult = detectWallet(itemName);
@@ -104,11 +122,17 @@ export function parseExpenseText(
     wallet = walletResult.wallet;
     itemName = walletResult.cleanedText;
   }
+
+  // Jika nama barang kosong atau hanya simbol, reject
+  if (!itemName) return null;
+
   return {
     itemName,
-    amount: totalAmount,
+    amount: finalAmount,
     currency,
     wallet,
+    splitCount,
+    originalAmount,
   };
 }
 
@@ -126,7 +150,7 @@ const GENERIC_VERBS = new Set(["beli", "bayar", "keluar", "habis", "belanja"]);
  */
 export function fuzzyParseExpense(
   text: string,
-  defaultCurrency = "IDR"
+  defaultCurrency = "IDR",
 ): FuzzyParseResult {
   if (!text || typeof text !== "string") {
     return { confidence: "none", parsed: null };

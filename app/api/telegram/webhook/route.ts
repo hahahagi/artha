@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateTelegramWebhook } from "@/lib/telegram/validate";
 import { TELEGRAM_MESSAGES } from "@/lib/telegram/messages";
-import {
-  fuzzyParseExpense,
-} from "@/lib/parser/expense-parser";
+import { fuzzyParseExpense } from "@/lib/parser/expense-parser";
 import { categorizeExpense } from "@/lib/parser/categorizer";
 import { formatCurrency } from "@/lib/utils/format";
 import { prisma } from "@/lib/prisma";
@@ -807,12 +805,23 @@ Apakah ini pengeluaran yang ingin Anda catat?
       }
 
       const amountFormatted = formatCurrency(parsed.amount, parsed.currency);
+      const splitInfo =
+        parsed.splitCount && parsed.originalAmount
+          ? {
+              originalFormatted: formatCurrency(
+                parsed.originalAmount,
+                parsed.currency,
+              ),
+              count: parsed.splitCount,
+            }
+          : undefined;
       const confirmationMsg = TELEGRAM_MESSAGES.expenseRecorded({
         itemName: parsed.itemName,
         amountFormatted,
         categoryName: categoryDisplayName,
         walletName: parsed.wallet,
         warning: budgetWarning,
+        splitInfo,
       });
 
       // Kirim konfirmasi dengan tombol inline [↩️ Batalkan]
