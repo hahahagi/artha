@@ -28,6 +28,8 @@ import {
   Receipt,
   Download,
 } from "lucide-react";
+import { ReceiptScanner } from "@/components/dashboard/receipt-scanner";
+import { Camera } from "lucide-react";
 
 interface Category {
   id: string;
@@ -68,6 +70,7 @@ export function ExpensesTable({
   // State Modal Tambah
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [newAmount, setNewAmount] = useState<number>(0);
   const [newCategoryId, setNewCategoryId] = useState<string>("");
 
@@ -218,6 +221,16 @@ export function ExpensesTable({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Tombol Scan Struk */}
+          <Button
+            variant="outline"
+            onClick={() => setIsScannerOpen(true)}
+            className="gap-2 rounded-xl text-xs font-medium"
+          >
+            <Camera className="h-4 w-4" />
+            <span>Scan Struk</span>
+          </Button>
+
           {/* Tombol Export CSV */}
           <Button
             variant="outline"
@@ -227,6 +240,7 @@ export function ExpensesTable({
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
           </Button>
+
           {/* Tombol Catat Transaksi Baru */}
           <Button
             onClick={() => setIsAddOpen(true)}
@@ -469,6 +483,16 @@ export function ExpensesTable({
           </div>
         </div>
       )}
+      {/* Modal Scanner Struk OCR */}
+      <ReceiptScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onApply={({ itemName, amount }) => {
+          setNewItemName(itemName);
+          setNewAmount(amount);
+          setIsAddOpen(true);
+        }}
+      />
     </div>
   );
 }
