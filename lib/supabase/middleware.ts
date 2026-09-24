@@ -48,19 +48,25 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // 2. Jika user BELUM login dan mencoba membuka halaman selain /login
-  if (!user && pathname !== "/login" && pathname !== "/") {
+    const isAuthRoute =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
+
+  // 2. Jika user BELUM login dan mencoba membuka halaman yang dilindungi
+  if (!user && !isAuthRoute && pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // 3. Jika user SUDAH login dan mencoba membuka /login kembali
-  if (user && pathname === "/login") {
+  // 3. Jika user SUDAH login dan mencoba membuka halaman login/register kembali
+  if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
-
+  
   return supabaseResponse;
 }
