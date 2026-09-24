@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { resetPasswordAction } from "@/app/(auth)/actions";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
 export default function ResetPasswordPage() {
@@ -10,8 +10,48 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [validatingSession, setValidatingSession] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const hasExchangedRef = useRef(false);
+  useEffect(() => {
+    // Mencegah React Strict Mode menjalankan kode dua kali
+    if (hasExchangedRef.current) return;
+    hasExchangedRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const exchangeCode = async () => {
+      const supabase = createClient();
+      // Cek jika sesi sudah aktif
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session) {
+        setValidatingSession(false);
+        return;
+      }
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          // Periksa kembali barangkali sesi sudah terbentuk
+          const { data: checkData } = await supabase.auth.getSession();
+          if (!checkData.session) {
+            setErrorMsg(
+              "Link reset password tidak valid atau sudah kadaluarsa. Silakan minta link baru.",
+            );
+          }
+        } else {
+          // Bersihkan kode dari URL agar URL bersih
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      } else {
+        setErrorMsg(
+          "Tidak ada sesi reset password aktif. Silakan minta link baru melalui halaman Lupa Password.",
+        );
+      }
+      setValidatingSession(false);
+    };
+    exchangeCode();
+  }, []);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,10 +69,15 @@ export default function ResetPasswordPage() {
 
     try {
       setLoading(true);
-      const res = await resetPasswordAction(password);
+      const supabase = createClient();
 
-      if (!res.success) {
-        setErrorMsg(res.error || "Gagal memperbarui password.");
+      // Perbarui password pengguna secara langsung
+      const { error } = await supabase.auth.updateUser({
+        password,
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
         return;
       }
 
@@ -83,7 +128,8 @@ export default function ResetPasswordPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              disabled={validatingSession}
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 disabled:opacity-50"
             />
           </div>
 
@@ -98,16 +144,21 @@ export default function ResetPasswordPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              disabled={validatingSession}
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 disabled:opacity-50"
             />
           </div>
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || validatingSession}
             className="w-full rounded-xl py-2 text-sm font-semibold"
           >
-            {loading ? "Menyimpan..." : "Simpan Password Baru"}
+            {loading
+              ? "Menyimpan..."
+              : validatingSession
+                ? "Memverifikasi link..."
+                : "Simpan Password Baru"}
           </Button>
         </form>
       </div>
