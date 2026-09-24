@@ -41,9 +41,6 @@ export function DashboardSidebar({ userEmail }: { userEmail?: string }) {
           <span className="font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
             Artha
           </span>
-          <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-            Beta
-          </span>
         </div>
       </div>
 

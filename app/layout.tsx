@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Artha — Zero-Friction Expense Tracker",
-  description: "Catat pengeluaran dan kelola langganan tanpa ribet via Telegram Bot dan Web Dashboard.",
+  description:
+    "Catat pengeluaran dan kelola langganan tanpa ribet via Telegram Bot dan Web Dashboard.",
   applicationName: "Artha",
   appleWebApp: {
     capable: true,
@@ -25,8 +26,12 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icon-192.png",
+    apple: "/icon-192.png",
   },
 };
 
