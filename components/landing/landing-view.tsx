@@ -21,9 +21,6 @@ export function LandingView() {
               <Wallet className="h-5 w-5" />
             </div>
             <span className="font-bold text-lg tracking-tight">Artha</span>
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-              Beta
-            </span>
           </div>
 
           <div className="flex items-center gap-3">
