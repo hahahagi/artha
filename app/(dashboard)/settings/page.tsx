@@ -25,7 +25,9 @@ export default async function SettingsPage() {
   const isLinked = Boolean(dbUser?.telegramChatId);
   const telegramUsername = dbUser?.telegramUsername || null;
   // Konversi BigInt ke string untuk keamanan serialisasi Next.js
-  const telegramChatId = dbUser?.telegramChatId ? dbUser.telegramChatId.toString() : null;
+  const telegramChatId = dbUser?.telegramChatId
+    ? dbUser.telegramChatId.toString()
+    : null;
 
   return (
     <div className="space-y-6">
@@ -34,7 +36,8 @@ export default async function SettingsPage() {
           Pengaturan
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Kelola integrasi bot Telegram dan preferensi kategori pengeluaran Anda.
+          Kelola integrasi bot Telegram dan preferensi kategori pengeluaran
+          Anda.
         </p>
       </div>
 
@@ -43,6 +46,9 @@ export default async function SettingsPage() {
         telegramUsername={telegramUsername}
         telegramChatId={telegramChatId}
         categories={dbUser?.categories ?? []}
+        googleSheetId={dbUser?.googleSheetId ?? null}
+        googleSheetAutoSync={dbUser?.googleSheetAutoSync ?? false}
+        serviceAccountEmail={process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || null}
       />
     </div>
   );

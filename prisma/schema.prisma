@@ -14,21 +14,23 @@ enum ExpenseSource {
 }
 
 model User {
-  id               String         @id @default(cuid())
-  email            String?        @unique
-  telegramChatId   BigInt?        @unique
-  telegramUsername String?
-  linkToken        String?        @unique
-  linkTokenExpiry  DateTime?
-  defaultCurrency  String         @default("IDR")
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id                   String         @id @default(cuid())
+  email                String?        @unique
+  telegramChatId       BigInt?        @unique
+  telegramUsername     String?
+  linkToken            String?        @unique
+  linkTokenExpiry      DateTime?
+  defaultCurrency      String         @default("IDR")
+  googleSheetId        String?
+  googleSheetAutoSync  Boolean        @default(false)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
-  expenses         Expense[]
-  subscriptions    Subscription[]
-  categories       Category[]
-  wallets          Wallet[]
-  budgets          Budget[]
+  expenses             Expense[]
+  subscriptions        Subscription[]
+  categories           Category[]
+  wallets              Wallet[]
+  budgets              Budget[]
 
   @@map("users")
 }

@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,6 +15,8 @@ import {
   unlinkTelegramAction,
   createCategoryAction,
   deleteCategoryAction,
+  updateGoogleSheetsConfigAction,
+  syncGoogleSheetsAction,
 } from "@/app/(dashboard)/settings/actions";
 import {
   Send,
@@ -20,6 +28,7 @@ import {
   Trash2,
   Plus,
   RefreshCw,
+  Table as TableIcon,
 } from "lucide-react";
 
 interface Category {
@@ -33,11 +42,17 @@ export function SettingsView({
   telegramUsername,
   telegramChatId,
   categories,
+  googleSheetId = null,
+  googleSheetAutoSync = false,
+  serviceAccountEmail = null,
 }: {
   isLinked: boolean;
   telegramUsername?: string | null;
   telegramChatId?: string | null;
   categories: Category[];
+  googleSheetId?: string | null;
+  googleSheetAutoSync?: boolean;
+  serviceAccountEmail?: string | null;
 }) {
   const [pairingData, setPairingData] = useState<{
     token: string;
@@ -50,6 +65,11 @@ export function SettingsView({
   const [newCatName, setNewCatName] = useState("");
   const [newCatKeywords, setNewCatKeywords] = useState("");
   const [catLoading, setCatLoading] = useState(false);
+
+  const [sheetId, setSheetId] = useState(googleSheetId || "");
+  const [autoSync, setAutoSync] = useState(googleSheetAutoSync);
+  const [sheetLoading, setSheetLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   const handleGeneratePairing = async () => {
     try {
@@ -110,6 +130,34 @@ export function SettingsView({
     }
   };
 
+  const handleSaveSheetConfig = async () => {
+    try {
+      setSheetLoading(true);
+      await updateGoogleSheetsConfigAction({
+        googleSheetId: sheetId,
+        googleSheetAutoSync: autoSync,
+      });
+      alert("Pengaturan Google Sheets berhasil disimpan!");
+    } catch (err) {
+      alert("Gagal menyimpan pengaturan: " + (err as Error).message);
+    } finally {
+      setSheetLoading(false);
+    }
+  };
+  const handleManualSync = async () => {
+    try {
+      setSyncLoading(true);
+      const res = await syncGoogleSheetsAction();
+      alert(
+        `Berhasil menyinkronkan ${res.count} pengeluaran ke Google Spreadsheet!`,
+      );
+    } catch (err) {
+      alert("Gagal sinkronisasi: " + (err as Error).message);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl space-y-8">
       {/* 1. Integrasi Telegram */}
@@ -120,7 +168,8 @@ export function SettingsView({
             <CardTitle>Integrasi Bot Telegram</CardTitle>
           </div>
           <CardDescription>
-            Hubungkan akun web ini dengan bot Telegram Artha agar pengeluaran yang dicatat via chat langsung tersinkronisasi.
+            Hubungkan akun web ini dengan bot Telegram Artha agar pengeluaran
+            yang dicatat via chat langsung tersinkronisasi.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -133,7 +182,9 @@ export function SettingsView({
                     Akun Telegram Terhubung
                   </p>
                   <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                    {telegramUsername ? `@${telegramUsername}` : `Chat ID: ${telegramChatId}`}
+                    {telegramUsername
+                      ? `@${telegramUsername}`
+                      : `Chat ID: ${telegramChatId}`}
                   </p>
                 </div>
               </div>
@@ -156,8 +207,14 @@ export function SettingsView({
               </div>
 
               {!pairingData ? (
-                <Button onClick={handleGeneratePairing} disabled={loading} className="gap-2">
-                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                <Button
+                  onClick={handleGeneratePairing}
+                  disabled={loading}
+                  className="gap-2"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                  />
                   <span>Hubungkan dengan Telegram</span>
                 </Button>
               ) : (
@@ -167,7 +224,8 @@ export function SettingsView({
                       Langkah Menghubungkan:
                     </h4>
                     <p className="mt-1 text-xs text-zinc-500">
-                      Tautan ini hanya berlaku selama 15 menit. Klik tombol di bawah untuk membuka Telegram:
+                      Tautan ini hanya berlaku selama 15 menit. Klik tombol di
+                      bawah untuk membuka Telegram:
                     </p>
                   </div>
 
@@ -183,14 +241,23 @@ export function SettingsView({
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
 
-                    <Button variant="outline" onClick={handleCopyLink} className="gap-2">
-                      {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                    <Button
+                      variant="outline"
+                      onClick={handleCopyLink}
+                      className="gap-2"
+                    >
+                      {copied ? (
+                        <Check className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
                       <span>{copied ? "Link Disalin!" : "Salin Link"}</span>
                     </Button>
                   </div>
 
                   <div className="text-xs text-zinc-400">
-                    Atau kirim command berikut secara manual di chat bot Telegram:
+                    Atau kirim command berikut secara manual di chat bot
+                    Telegram:
                     <code className="ml-1 rounded bg-zinc-200 px-2 py-0.5 font-mono text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
                       /link {pairingData.token}
                     </code>
@@ -207,7 +274,8 @@ export function SettingsView({
         <CardHeader>
           <CardTitle>Kategori Pengeluaran Kustom</CardTitle>
           <CardDescription>
-            Tambahkan kategori dan kata kunci tambahan agar parser bot mengenali kebiasaan belanja Anda.
+            Tambahkan kategori dan kata kunci tambahan agar parser bot mengenali
+            kebiasaan belanja Anda.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -238,16 +306,25 @@ export function SettingsView({
             </h4>
             {categories.length === 0 ? (
               <p className="text-xs text-zinc-400 py-2">
-                Belum ada kategori kustom. Sistem menggunakan 6 kategori default bawaan Artha.
+                Belum ada kategori kustom. Sistem menggunakan 6 kategori default
+                bawaan Artha.
               </p>
             ) : (
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {categories.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between py-2.5">
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between py-2.5"
+                  >
                     <div>
-                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{c.name}</p>
+                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {c.name}
+                      </p>
                       <p className="text-xs text-zinc-400">
-                        Keywords: {c.keywords.length > 0 ? c.keywords.join(", ") : "Tidak ada"}
+                        Keywords:{" "}
+                        {c.keywords.length > 0
+                          ? c.keywords.join(", ")
+                          : "Tidak ada"}
                       </p>
                     </div>
                     <Button
@@ -261,6 +338,102 @@ export function SettingsView({
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Kartu Integrasi Google Sheets */}
+      <Card className="rounded-2xl border-zinc-200 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <TableIcon className="h-5 w-5 text-emerald-500" />
+            <CardTitle className="text-lg">Google Sheets Sync</CardTitle>
+          </div>
+          <CardDescription>
+            Sinkronkan catatan pengeluaran ke Google Spreadsheet Anda secara
+            real-time.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {serviceAccountEmail && (
+            <div className="rounded-xl bg-zinc-50 p-4 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+              <p className="font-semibold text-zinc-800 dark:text-zinc-200">
+                Cara Menghubungkan Google Sheets:
+              </p>
+              <ol className="mt-2 list-decimal list-inside space-y-1">
+                <li>Buat spreadsheet baru di Google Sheets.</li>
+                <li>
+                  Klik tombol <b>Bagikan (Share)</b>, lalu tambahkan email
+                  Service Account ini sebagai <b>Editor</b>:
+                  <div className="mt-1 flex items-center gap-2 rounded bg-zinc-100 p-1.5 font-mono text-[11px] dark:bg-zinc-800">
+                    <span className="truncate">{serviceAccountEmail}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigator.clipboard.writeText(serviceAccountEmail)
+                      }
+                      className="text-indigo-500 hover:underline"
+                    >
+                      Salin
+                    </button>
+                  </div>
+                </li>
+                <li>
+                  Salin <b>Spreadsheet ID</b> dari link URL browser Anda dan
+                  tempel di bawah ini.
+                </li>
+              </ol>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              Spreadsheet ID
+            </label>
+            <Input
+              value={sheetId}
+              onChange={(e) => setSheetId(e.target.value)}
+              placeholder="Contoh: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="autoSync"
+              checked={autoSync}
+              onChange={(e) => setAutoSync(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label
+              htmlFor="autoSync"
+              className="text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer"
+            >
+              Auto-Sync otomatis setiap ada transaksi baru
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <Button
+              onClick={handleSaveSheetConfig}
+              disabled={sheetLoading}
+              size="sm"
+              className="rounded-xl text-xs font-medium"
+            >
+              {sheetLoading ? "Menyimpan..." : "Simpan Pengaturan"}
+            </Button>
+
+            {sheetId && (
+              <Button
+                variant="outline"
+                onClick={handleManualSync}
+                disabled={syncLoading}
+                size="sm"
+                className="rounded-xl text-xs font-medium"
+              >
+                {syncLoading ? "Menyinkronkan..." : "Sinkronkan Sekarang"}
+              </Button>
             )}
           </div>
         </CardContent>

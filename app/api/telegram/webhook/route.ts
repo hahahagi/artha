@@ -17,6 +17,7 @@ import {
   downloadTelegramFile,
   transcribeVoiceNote,
 } from "@/lib/telegram/voice";
+import { appendExpenseToSheet } from "@/lib/sheets/google-sheets";
 
 export async function POST(req: NextRequest) {
   try {
@@ -273,6 +274,20 @@ export async function POST(req: NextRequest) {
                 source: "TELEGRAM",
               },
             });
+
+            // Auto-Sync ke Google Sheets jika diaktifkan oleh pengguna
+            if (dbUser.googleSheetAutoSync && dbUser.googleSheetId) {
+              appendExpenseToSheet(dbUser.googleSheetId, {
+                date: new Date().toLocaleDateString("id-ID"),
+                itemName,
+                category: categoryDisplayName,
+                amount,
+                currency: dbUser.defaultCurrency,
+                source: "TELEGRAM",
+              }).catch((err) =>
+                console.error("[Webhook Google Sheets Sync Error]:", err),
+              );
+            }
 
             await answerCallbackQuery(cqId, "Pengeluaran berhasil dicatat!");
 
@@ -808,6 +823,21 @@ Apakah ini pengeluaran yang ingin Anda catat?
           source: "TELEGRAM",
         },
       });
+
+      // Auto-Sync ke Google Sheets jika diaktifkan oleh pengguna
+      if (user.googleSheetAutoSync && user.googleSheetId) {
+        appendExpenseToSheet(user.googleSheetId, {
+          date: new Date().toLocaleDateString("id-ID"),
+          itemName: parsed.itemName,
+          category: categoryDisplayName,
+          amount: parsed.amount,
+          currency: parsed.currency,
+          wallet: parsed.wallet,
+          source: "TELEGRAM",
+        }).catch((err) =>
+          console.error("[Webhook Google Sheets Sync Error]:", err),
+        );
+      }
 
       // 12. Cek Batas Anggaran (Budget Threshold Warning)
       let budgetWarning: string | undefined;
