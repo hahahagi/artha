@@ -1,29 +1,32 @@
+import { detectWallet } from "./wallet-detector";
+
 export interface ParsedExpense {
   itemName: string;
   amount: number;
   currency: string;
+  wallet?: string;
 }
 
 // Peta konversi simbol dan kata mata uang ke kode ISO 4217
 const CURRENCY_MAP: Record<string, string> = {
-  "$": "USD",
+  $: "USD",
   "€": "EUR",
   "£": "GBP",
   "¥": "JPY",
-  "rp": "IDR",
-  "usd": "USD",
-  "eur": "EUR",
-  "euro": "EUR",
-  "gbp": "GBP",
-  "jpy": "JPY",
-  "sgd": "SGD",
-  "myr": "MYR",
-  "idr": "IDR",
+  rp: "IDR",
+  usd: "USD",
+  eur: "EUR",
+  euro: "EUR",
+  gbp: "GBP",
+  jpy: "JPY",
+  sgd: "SGD",
+  myr: "MYR",
+  idr: "IDR",
 };
 
 export function parseExpenseText(
   text: string,
-  defaultCurrency = "IDR"
+  defaultCurrency = "IDR",
 ): ParsedExpense | null {
   if (!text || typeof text !== "string") return null;
 
@@ -31,7 +34,8 @@ export function parseExpenseText(
   if (!trimmed) return null;
 
   // 1. Deteksi Mata Uang (simbol atau kode kata)
-  const currencyRegex = /(\$|€|£|¥|\b(?:rp|usd|eur|euro|gbp|jpy|sgd|myr|idr)\b)/i;
+  const currencyRegex =
+    /(\$|€|£|¥|\b(?:rp|usd|eur|euro|gbp|jpy|sgd|myr|idr)\b)/i;
   const currMatch = trimmed.match(currencyRegex);
   let currency = defaultCurrency;
   if (currMatch) {
@@ -45,13 +49,12 @@ export function parseExpenseText(
   const qty = multMatch ? parseInt(multMatch[1], 10) : 1;
 
   // Hilangkan multiplier dari teks kerja agar tidak mengganggu pencarian nominal
-  const workingText = multMatch
-    ? trimmed.replace(multMatch[0], " ")
-    : trimmed;
+  const workingText = multMatch ? trimmed.replace(multMatch[0], " ") : trimmed;
 
   // 3. Deteksi Pola Nominal Angka
   // Mendukung format ribuan bertitik (25.000), desimal (25,5k), satuan k/rb/jt, atau angka polos
-  const amountRegex = /(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(k|rb|ribu|jt|juta)?\b/i;
+  const amountRegex =
+    /(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(k|rb|ribu|jt|juta)?\b/i;
   const amountMatch = workingText.match(amountRegex);
 
   if (!amountMatch) return null;
@@ -88,15 +91,23 @@ export function parseExpenseText(
   itemName = itemName.replace(currencyRegex, " ");
   itemName = itemName
     .replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, "") // Hapus dash/tanda baca di awal/akhir
-    .replace(/\s+/g, " ")                    // Rapikan multiple spasi
+    .replace(/\s+/g, " ") // Rapikan multiple spasi
     .trim();
 
   // Jika nama barang kosong atau hanya simbol, reject
+  // Jika nama barang kosong atau hanya simbol, reject
   if (!itemName) return null;
-
+  // 5. Deteksi Sumber Dana / Wallet (contoh: bca, gopay, tunai, ovo, dll)
+  let wallet: string | undefined;
+  const walletResult = detectWallet(itemName);
+  if (walletResult) {
+    wallet = walletResult.wallet;
+    itemName = walletResult.cleanedText;
+  }
   return {
     itemName,
     amount: totalAmount,
     currency,
+    wallet,
   };
 }

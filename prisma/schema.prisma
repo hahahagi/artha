@@ -27,6 +27,7 @@ model User {
   expenses         Expense[]
   subscriptions    Subscription[]
   categories       Category[]
+  wallets          Wallet[]
 
   @@map("users")
 }
@@ -50,6 +51,7 @@ model Expense {
   currency    String        @default("IDR")
   itemName    String
   categoryId  String?
+  wallet      String?
   rawText     String
   source      ExpenseSource @default(TELEGRAM)
   createdAt   DateTime      @default(now())
@@ -79,4 +81,14 @@ model Subscription {
   @@unique([userId, serviceName])
   @@index([userId, isActive])
   @@map("subscriptions")
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@map("wallets")
 }

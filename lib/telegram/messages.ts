@@ -41,13 +41,14 @@ Ketik <b>/help</b> untuk melihat panduan lengkap.
     itemName: string;
     amountFormatted: string;
     categoryName: string;
+    walletName?: string;
   }) =>
     `
 ✅ <b>Pengeluaran Berhasil Dicatat!</b>
 
 📝 <b>Item:</b> ${data.itemName}
 💰 <b>Nominal:</b> ${data.amountFormatted}
-🏷️ <b>Kategori:</b> ${data.categoryName}
+🏷️ <b>Kategori:</b> ${data.categoryName}${data.walletName ? `\n💳 <b>Sumber:</b> ${data.walletName}` : ""}
 `.trim(),
 
   parseFailed: () =>

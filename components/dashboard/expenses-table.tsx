@@ -40,6 +40,7 @@ interface Expense {
   currency: string;
   categoryId: string | null;
   category: Category | null;
+  wallet?: string | null;
   source: "TELEGRAM" | "WEB";
   createdAt: Date;
 }
@@ -87,10 +88,14 @@ export function ExpensesTable({
       })
       .sort((a, b) => {
         if (sortOption === "date-desc") {
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
         }
         if (sortOption === "date-asc") {
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
         }
         if (sortOption === "amount-desc") {
           return b.amount - a.amount;
@@ -198,7 +203,9 @@ export function ExpensesTable({
             <ArrowUpDown className="h-4 w-4 text-zinc-400" />
             <select
               value={sortOption}
-              onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
+              onChange={(e) =>
+                setSortOption(e.target.value as typeof sortOption)
+              }
               className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200"
             >
               <option value="date-desc">Tanggal: Terbaru</option>
@@ -232,7 +239,10 @@ export function ExpensesTable({
           <TableBody>
             {filteredExpenses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-zinc-400">
+                <TableCell
+                  colSpan={6}
+                  className="h-32 text-center text-zinc-400"
+                >
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Receipt className="h-6 w-6 text-zinc-300" />
                     <span>Tidak ada catatan pengeluaran yang cocok.</span>
@@ -250,7 +260,14 @@ export function ExpensesTable({
                     })}
                   </TableCell>
                   <TableCell className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {exp.itemName}
+                    <div className="flex items-center gap-2">
+                      <span>{exp.itemName}</span>
+                      {exp.wallet && (
+                        <span className="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          💳 {exp.wallet}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-xs">

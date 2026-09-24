@@ -630,6 +630,7 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
           amount: parsed.amount,
           currency: parsed.currency,
           categoryId,
+          wallet: parsed.wallet ?? null,
           rawText: text,
           source: "TELEGRAM",
         },
@@ -640,6 +641,7 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
         itemName: parsed.itemName,
         amountFormatted,
         categoryName: categoryDisplayName,
+        walletName: parsed.wallet,
       });
 
       // Kirim konfirmasi dengan tombol inline [↩️ Batalkan]
