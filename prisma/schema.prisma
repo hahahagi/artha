@@ -28,6 +28,7 @@ model User {
   subscriptions    Subscription[]
   categories       Category[]
   wallets          Wallet[]
+  budgets          Budget[]
 
   @@map("users")
 }
@@ -39,6 +40,7 @@ model Category {
   keywords  String[]
   user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses  Expense[]
+  budgets   Budget[]
 
   @@unique([userId, name])
   @@map("categories")
@@ -91,4 +93,20 @@ model Wallet {
 
   @@unique([userId, name])
   @@map("wallets")
+}
+
+model Budget {
+  id         String    @id @default(cuid())
+  userId     String
+  categoryId String?
+  amount     Int
+  period     String    @default("monthly")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, categoryId])
+  @@map("budgets")
 }

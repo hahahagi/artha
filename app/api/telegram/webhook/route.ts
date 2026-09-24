@@ -636,12 +636,49 @@ Ketik <b>/sub list</b> untuk melihat daftar langganan aktif Anda.
         },
       });
 
+      // 12. Cek Batas Anggaran (Budget Threshold Warning)
+      let budgetWarning: string | undefined;
+      if (categoryId) {
+        const budget = await prisma.budget.findUnique({
+          where: {
+            userId_categoryId: {
+              userId: user.id,
+              categoryId,
+            },
+          },
+        });
+
+        if (budget && budget.amount > 0) {
+          const now = new Date();
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+          const monthCategoryExpenses = await prisma.expense.aggregate({
+            where: {
+              userId: user.id,
+              categoryId,
+              createdAt: { gte: startOfMonth },
+            },
+            _sum: { amount: true },
+          });
+
+          const totalCatSpent = monthCategoryExpenses._sum.amount ?? 0;
+          const percentage = Math.round((totalCatSpent / budget.amount) * 100);
+
+          if (percentage >= 100) {
+            budgetWarning = `\n\n🚨 <b>Peringatan Anggaran:</b> Kategori <b>${categoryDisplayName}</b> telah melebihi batas (${percentage}% terpakai - ${formatCurrency(totalCatSpent, parsed.currency)} / ${formatCurrency(budget.amount, parsed.currency)})!`;
+          } else if (percentage >= 80) {
+            budgetWarning = `\n\n⚠️ <b>Perhatian Anggaran:</b> Kategori <b>${categoryDisplayName}</b> sudah mencapai ${percentage}% dari kuota bulanan (${formatCurrency(totalCatSpent, parsed.currency)} / ${formatCurrency(budget.amount, parsed.currency)}).`;
+          }
+        }
+      }
+
       const amountFormatted = formatCurrency(parsed.amount, parsed.currency);
       const confirmationMsg = TELEGRAM_MESSAGES.expenseRecorded({
         itemName: parsed.itemName,
         amountFormatted,
         categoryName: categoryDisplayName,
         walletName: parsed.wallet,
+        warning: budgetWarning,
       });
 
       // Kirim konfirmasi dengan tombol inline [↩️ Batalkan]

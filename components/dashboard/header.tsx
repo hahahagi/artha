@@ -9,6 +9,7 @@ import {
   Wallet,
   LayoutDashboard,
   Receipt,
+  PiggyBank,
   CalendarClock,
   Settings,
   LogOut,
@@ -18,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Pengeluaran", href: "/expenses", icon: Receipt },
+  { name: "Anggaran", href: "/budgets", icon: PiggyBank },
   { name: "Langganan", href: "/subscriptions", icon: CalendarClock },
   { name: "Pengaturan", href: "/settings", icon: Settings },
 ];
