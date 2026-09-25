@@ -131,6 +131,21 @@ export async function deleteCategoryAction(id: string) {
 }
 
 /**
+ * Helper mengekstrak Spreadsheet ID apabila user menempelkan URL lengkap Google Sheets
+ */
+function extractSpreadsheetId(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return trimmed;
+}
+
+/**
  * Menyimpan konfigurasi Spreadsheet ID dan Auto-Sync
  */
 export async function updateGoogleSheetsConfigAction(data: {
@@ -138,16 +153,19 @@ export async function updateGoogleSheetsConfigAction(data: {
   googleSheetAutoSync: boolean;
 }) {
   const user = await getAuthenticatedUser();
+  const cleanSheetId = extractSpreadsheetId(data.googleSheetId);
+
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      googleSheetId: data.googleSheetId?.trim() || null,
+      googleSheetId: cleanSheetId,
       googleSheetAutoSync: data.googleSheetAutoSync,
     },
   });
   revalidatePath("/settings");
-  return { success: true };
+  return { success: true, sheetId: cleanSheetId };
 }
+
 /**
  * Sinkronisasi manual seluruh data pengeluaran ke Google Spreadsheet
  */

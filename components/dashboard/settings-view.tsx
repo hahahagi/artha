@@ -29,6 +29,7 @@ import {
   Plus,
   RefreshCw,
   Table as TableIcon,
+  Mic,
 } from "lucide-react";
 import { useFeedback } from "@/components/ui/feedback-provider";
 
@@ -46,6 +47,7 @@ export function SettingsView({
   googleSheetId = null,
   googleSheetAutoSync = false,
   serviceAccountEmail = null,
+  witAiConfigured = false,
 }: {
   isLinked: boolean;
   telegramUsername?: string | null;
@@ -54,6 +56,7 @@ export function SettingsView({
   googleSheetId?: string | null;
   googleSheetAutoSync?: boolean;
   serviceAccountEmail?: string | null;
+  witAiConfigured?: boolean;
 }) {
   const [pairingData, setPairingData] = useState<{
     token: string;
@@ -195,10 +198,13 @@ export function SettingsView({
   const handleSaveSheetConfig = async () => {
     try {
       setSheetLoading(true);
-      await updateGoogleSheetsConfigAction({
+      const res = await updateGoogleSheetsConfigAction({
         googleSheetId: sheetId,
         googleSheetAutoSync: autoSync,
       });
+      if (res.sheetId !== undefined) {
+        setSheetId(res.sheetId || "");
+      }
       showToast({
         variant: "success",
         title: "Pengaturan disimpan!",
@@ -237,16 +243,17 @@ export function SettingsView({
 
   return (
     <div className="max-w-4xl space-y-8">
-      {/* 1. Integrasi Telegram */}
+      {/* 1. Integrasi Telegram & Voice Note AI (Wit.ai) */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Send className="h-5 w-5 text-sky-500" />
-            <CardTitle>Integrasi Bot Telegram</CardTitle>
+            <CardTitle>Integrasi Bot Telegram & Voice Note AI</CardTitle>
           </div>
           <CardDescription>
             Hubungkan akun web ini dengan bot Telegram Artha agar pengeluaran
-            yang dicatat via chat langsung tersinkronisasi.
+            via chat teks maupun pesan suara (Voice Note Wit.ai) langsung
+            tersinkronisasi ke Dashboard dan Google Sheets.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -343,6 +350,34 @@ export function SettingsView({
               )}
             </div>
           )}
+
+          {/* Info Status Voice Note AI (Wit.ai) */}
+          <div className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3.5 text-xs dark:border-zinc-800 dark:bg-zinc-900/60">
+            <Mic className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
+            <div className="flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                  Pencatatan Suara (Wit.ai Speech-to-Text):
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                    witAiConfigured
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                      : "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
+                  }`}
+                >
+                  {witAiConfigured ? "● Aktif" : "○ WIT_AI_TOKEN Belum Diisi"}
+                </span>
+              </div>
+              <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                Kirim pesan suara ke bot Telegram (contoh:{" "}
+                <i>&quot;kopi susu dua puluh lima ribu pakai gopay&quot;</i>).
+                Wit.ai otomatis mengubah suara menjadi transaksi, menyimpan ke
+                database, dan meneruskannya ke Google Sheets jika Auto-Sync
+                aktif.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -420,7 +455,7 @@ export function SettingsView({
         </CardContent>
       </Card>
 
-      {/* Kartu Integrasi Google Sheets */}
+      {/* 3. Kartu Integrasi Google Sheets */}
       <Card className="rounded-2xl border-zinc-200 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -428,50 +463,67 @@ export function SettingsView({
             <CardTitle className="text-lg">Google Sheets Sync</CardTitle>
           </div>
           <CardDescription>
-            Sinkronkan catatan pengeluaran ke Google Spreadsheet Anda secara
-            real-time.
+            Sinkronkan seluruh pengeluaran dari Telegram (Teks & Voice Note
+            Wit.ai) maupun Web Dashboard (Input Manual & Scan Struk OCR) ke
+            Google Spreadsheet Anda secara real-time.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {serviceAccountEmail && (
-            <div className="rounded-xl bg-zinc-50 p-4 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
-              <p className="font-semibold text-zinc-800 dark:text-zinc-200">
-                Cara Menghubungkan Google Sheets:
-              </p>
-              <ol className="mt-2 list-decimal list-inside space-y-1">
-                <li>Buat spreadsheet baru di Google Sheets.</li>
-                <li>
-                  Klik tombol <b>Bagikan (Share)</b>, lalu tambahkan email
-                  Service Account ini sebagai <b>Editor</b>:
-                  <div className="mt-1 flex items-center gap-2 rounded bg-zinc-100 p-1.5 font-mono text-[11px] dark:bg-zinc-800">
-                    <span className="truncate">{serviceAccountEmail}</span>
+          <div className="rounded-xl bg-zinc-50 p-4 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+            <p className="font-semibold text-zinc-800 dark:text-zinc-200">
+              Cara Menghubungkan Google Sheets:
+            </p>
+            <ol className="mt-2 list-decimal list-inside space-y-1.5">
+              <li>Buat spreadsheet baru (kosong) di Google Sheets Anda.</li>
+              <li>
+                Klik tombol <b>Bagikan (Share)</b> di pojok kanan atas Google
+                Sheets, lalu tambahkan alamat email Service Account berikut
+                sebagai <b>Editor</b>:
+                {serviceAccountEmail ? (
+                  <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 font-mono text-[11px] dark:border-zinc-800 dark:bg-zinc-950">
+                    <span className="truncate text-zinc-800 dark:text-zinc-200">
+                      {serviceAccountEmail}
+                    </span>
                     <button
                       type="button"
-                      onClick={() =>
-                        navigator.clipboard.writeText(serviceAccountEmail)
-                      }
-                      className="text-indigo-500 hover:underline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(serviceAccountEmail);
+                        showToast({
+                          variant: "success",
+                          title: "Email Service Account disalin!",
+                          description:
+                            "Tempelkan email ini di menu Share Google Sheets Anda sebagai Editor.",
+                        });
+                      }}
+                      className="shrink-0 font-sans font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
                     >
-                      Salin
+                      Salin Email
                     </button>
                   </div>
-                </li>
-                <li>
-                  Salin <b>Spreadsheet ID</b> dari link URL browser Anda dan
-                  tempel di bawah ini.
-                </li>
-              </ol>
-            </div>
-          )}
+                ) : (
+                  <div className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                    Variabel <code>GOOGLE_SERVICE_ACCOUNT_EMAIL</code> &{" "}
+                    <code>GOOGLE_PRIVATE_KEY</code> belum diatur di environment
+                    server (<code>.env</code>).
+                  </div>
+                )}
+              </li>
+              <li>
+                Salin <b>Link URL Google Sheets</b> (atau{" "}
+                <b>Spreadsheet ID</b>-nya) dari browser Anda dan tempel di kolom
+                bawah ini.
+              </li>
+            </ol>
+          </div>
 
           <div className="space-y-2">
             <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-              Spreadsheet ID
+              Link URL Google Sheets atau Spreadsheet ID
             </label>
             <Input
               value={sheetId}
               onChange={(e) => setSheetId(e.target.value)}
-              placeholder="Contoh: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+              placeholder="Tempel link https://docs.google.com/spreadsheets/d/... atau ID-nya"
             />
           </div>
 
@@ -487,7 +539,8 @@ export function SettingsView({
               htmlFor="autoSync"
               className="text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer"
             >
-              Auto-Sync otomatis setiap ada transaksi baru
+              Auto-Sync otomatis setiap ada transaksi baru (Telegram, Voice
+              Note, & Web)
             </label>
           </div>
 

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { appendExpenseToSheet } from "@/lib/sheets/google-sheets";
 
 async function getAuthenticatedUser() {
   const supabase = await createClient();
@@ -26,7 +27,7 @@ async function getAuthenticatedUser() {
 }
 
 /**
- * Tambah transaksi manual via Web
+ * Tambah transaksi manual / hasil Scan Struk OCR via Web
  */
 export async function createExpenseAction(formData: {
   itemName: string;
@@ -36,7 +37,7 @@ export async function createExpenseAction(formData: {
 }) {
   const user = await getAuthenticatedUser();
 
-  await prisma.expense.create({
+  const created = await prisma.expense.create({
     data: {
       userId: user.id,
       itemName: formData.itemName.trim(),
@@ -46,7 +47,27 @@ export async function createExpenseAction(formData: {
       rawText: `${formData.itemName} ${formData.amount}`,
       source: "WEB",
     },
+    include: {
+      category: true,
+    },
   });
+
+  // Sinkronisasi real-time ke Google Sheets jika fitur Auto-Sync diaktifkan oleh user
+  if (user.googleSheetId && user.googleSheetAutoSync) {
+    try {
+      await appendExpenseToSheet(user.googleSheetId, {
+        date: created.createdAt.toLocaleDateString("id-ID"),
+        itemName: created.itemName,
+        category: created.category?.name || "Lainnya",
+        amount: created.amount,
+        currency: created.currency,
+        wallet: created.wallet || undefined,
+        source: created.source,
+      });
+    } catch (sheetErr) {
+      console.error("[Web Expense -> Google Sheets AutoSync Error]:", sheetErr);
+    }
+  }
 
   revalidatePath("/expenses");
   revalidatePath("/");

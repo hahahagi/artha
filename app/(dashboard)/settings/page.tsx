@@ -24,10 +24,22 @@ export default async function SettingsPage() {
 
   const isLinked = Boolean(dbUser?.telegramChatId);
   const telegramUsername = dbUser?.telegramUsername || null;
-  // Konversi BigInt ke string untuk keamanan serialisasi Next.js
   const telegramChatId = dbUser?.telegramChatId
     ? dbUser.telegramChatId.toString()
     : null;
+
+  const rawServiceEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
+  const serviceAccountEmail =
+    rawServiceEmail &&
+    rawServiceEmail !==
+      "your-service-account@your-project.iam.gserviceaccount.com"
+      ? rawServiceEmail
+      : null;
+
+  const rawWitToken = process.env.WIT_AI_TOKEN?.trim();
+  const witAiConfigured = Boolean(
+    rawWitToken && rawWitToken !== "your-wit-ai-server-access-token"
+  );
 
   return (
     <div className="space-y-6">
@@ -36,8 +48,8 @@ export default async function SettingsPage() {
           Pengaturan
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Kelola integrasi bot Telegram dan preferensi kategori pengeluaran
-          Anda.
+          Kelola integrasi bot Telegram, Voice Note AI, kategori kustom, dan
+          sinkronisasi Google Sheets Anda.
         </p>
       </div>
 
@@ -48,7 +60,8 @@ export default async function SettingsPage() {
         categories={dbUser?.categories ?? []}
         googleSheetId={dbUser?.googleSheetId ?? null}
         googleSheetAutoSync={dbUser?.googleSheetAutoSync ?? false}
-        serviceAccountEmail={process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || null}
+        serviceAccountEmail={serviceAccountEmail}
+        witAiConfigured={witAiConfigured}
       />
     </div>
   );
