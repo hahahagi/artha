@@ -9,6 +9,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function LandingView() {
   return (
@@ -33,8 +34,12 @@ export function LandingView() {
               <Send className="h-3.5 w-3.5" />
               <span>Bot Telegram</span>
             </a>
+            <ThemeToggle />
             <Link href="/login">
-              <Button size="sm" className="rounded-xl px-4 text-xs font-semibold">
+              <Button
+                size="sm"
+                className="rounded-xl px-4 text-xs font-semibold"
+              >
                 Masuk
               </Button>
             </Link>
@@ -58,12 +63,17 @@ export function LandingView() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base text-zinc-600 dark:text-zinc-400 sm:text-lg">
-            Cukup kirim chat santai ke bot Telegram, Artha otomatis mengenali nominal, kategori, dan menyajikannya ke dalam dashboard analitik yang rapi.
+            Cukup kirim chat santai ke bot Telegram, Artha otomatis mengenali
+            nominal, kategori, dan menyajikannya ke dalam dashboard analitik
+            yang rapi.
           </p>
 
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/login">
-              <Button size="lg" className="w-full gap-2 rounded-xl text-sm font-semibold sm:w-auto">
+              <Button
+                size="lg"
+                className="w-full gap-2 rounded-xl text-sm font-semibold sm:w-auto"
+              >
                 <span>Mulai Sekarang — Gratis</span>
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -86,7 +96,9 @@ export function LandingView() {
                 <Send className="h-3.5 w-3.5" />
               </div>
               <div>
-                <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Artha Telegram Bot</p>
+                <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                  Artha Telegram Bot
+                </p>
                 <p className="text-[10px] text-zinc-400">Online 24/7</p>
               </div>
             </div>
@@ -101,9 +113,15 @@ export function LandingView() {
               {/* Bubble Chat Bot */}
               <div className="flex justify-start">
                 <div className="rounded-2xl rounded-tl-sm bg-white p-3 shadow-sm border border-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200">
-                  <p className="font-semibold text-emerald-600 dark:text-emerald-400">✅ Pengeluaran Dicatat!</p>
-                  <p className="mt-1 text-zinc-500">☕ Kopi Susu • <b>Rp 25.000</b></p>
-                  <p className="text-[10px] text-zinc-400">Kategori: Makanan & Minuman</p>
+                  <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    ✅ Pengeluaran Dicatat!
+                  </p>
+                  <p className="mt-1 text-zinc-500">
+                    ☕ Kopi Susu • <b>Rp 25.000</b>
+                  </p>
+                  <p className="text-[10px] text-zinc-400">
+                    Kategori: Makanan & Minuman
+                  </p>
                 </div>
               </div>
               {/* Bubble Chat User 2 */}
@@ -115,9 +133,15 @@ export function LandingView() {
               {/* Bubble Chat Bot 2 */}
               <div className="flex justify-start">
                 <div className="rounded-2xl rounded-tl-sm bg-white p-3 shadow-sm border border-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200">
-                  <p className="font-semibold text-emerald-600 dark:text-emerald-400">✅ Langganan Terdaftar!</p>
-                  <p className="mt-1 text-zinc-500">📺 Netflix • <b>Rp 54.000/bln</b> (Tgl 25)</p>
-                  <p className="text-[10px] text-zinc-400">💡 Pengingat H-3 dan H-0 otomatis aktif.</p>
+                  <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    ✅ Langganan Terdaftar!
+                  </p>
+                  <p className="mt-1 text-zinc-500">
+                    📺 Netflix • <b>Rp 54.000/bln</b> (Tgl 25)
+                  </p>
+                  <p className="text-[10px] text-zinc-400">
+                    💡 Pengingat H-3 dan H-0 otomatis aktif.
+                  </p>
                 </div>
               </div>
             </div>
@@ -142,9 +166,23 @@ export function LandingView() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
                 <Receipt className="h-5 w-5" />
               </div>
-              <h3 className="mt-4 font-bold text-base">Natural Language Parsing</h3>
+              <h3 className="mt-4 font-bold text-base">
+                Natural Language Parsing
+              </h3>
               <p className="mt-2 text-xs text-zinc-500 leading-relaxed dark:text-zinc-400">
-                Mendukung gaya ketik alami orang Indonesia: <code className="font-mono text-zinc-700 dark:text-zinc-300">25k</code>, <code className="font-mono text-zinc-700 dark:text-zinc-300">55.000</code>, perkalian <code className="font-mono text-zinc-700 dark:text-zinc-300">2x 15rb</code>, dan multi-mata uang asing ($20, SGD, EUR).
+                Mendukung gaya ketik alami orang Indonesia:{" "}
+                <code className="font-mono text-zinc-700 dark:text-zinc-300">
+                  25k
+                </code>
+                ,{" "}
+                <code className="font-mono text-zinc-700 dark:text-zinc-300">
+                  55.000
+                </code>
+                , perkalian{" "}
+                <code className="font-mono text-zinc-700 dark:text-zinc-300">
+                  2x 15rb
+                </code>
+                , dan multi-mata uang asing ($20, SGD, EUR).
               </p>
             </div>
 
@@ -152,9 +190,13 @@ export function LandingView() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400">
                 <CalendarClock className="h-5 w-5" />
               </div>
-              <h3 className="mt-4 font-bold text-base">Subscription Reminder</h3>
+              <h3 className="mt-4 font-bold text-base">
+                Subscription Reminder
+              </h3>
               <p className="mt-2 text-xs text-zinc-500 leading-relaxed dark:text-zinc-400">
-                Pantau tagihan rutin bulanan (Netflix, Spotify, Internet). Bot akan otomatis mengirimkan notifikasi H-3 dan hari-H sebelum saldo Anda terpotong.
+                Pantau tagihan rutin bulanan (Netflix, Spotify, Internet). Bot
+                akan otomatis mengirimkan notifikasi H-3 dan hari-H sebelum
+                saldo Anda terpotong.
               </p>
             </div>
 
@@ -164,7 +206,9 @@ export function LandingView() {
               </div>
               <h3 className="mt-4 font-bold text-base">Web Dashboard & PWA</h3>
               <p className="mt-2 text-xs text-zinc-500 leading-relaxed dark:text-zinc-400">
-                Dashboard analitik dengan grafik tren, diagram proporsi kategori, serta tabel dengan filter dan sorting. Dapat di-install langsung di layar smartphone Anda.
+                Dashboard analitik dengan grafik tren, diagram proporsi
+                kategori, serta tabel dengan filter dan sorting. Dapat
+                di-install langsung di layar smartphone Anda.
               </p>
             </div>
           </div>
@@ -178,11 +222,15 @@ export function LandingView() {
             Mulai Kendalikan Arus Finansial Anda
           </h2>
           <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-            Daftar dalam 10 detik menggunakan akun Google Anda dan sambungkan dengan bot Telegram.
+            Daftar dalam 10 detik menggunakan akun Google Anda dan sambungkan
+            dengan bot Telegram.
           </p>
           <div className="mt-6">
             <Link href="/login">
-              <Button size="lg" className="rounded-xl px-6 text-sm font-semibold">
+              <Button
+                size="lg"
+                className="rounded-xl px-6 text-sm font-semibold"
+              >
                 Masuk dengan Google
               </Button>
             </Link>

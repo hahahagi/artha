@@ -15,6 +15,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -61,6 +62,7 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
         </div>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <span className="hidden text-xs text-zinc-500 sm:inline-block">
             {userEmail}
           </span>
