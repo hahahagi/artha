@@ -34,6 +34,7 @@ import {
   CheckCircle2,
   PauseCircle,
 } from "lucide-react";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 interface Subscription {
   id: string;
@@ -72,6 +73,7 @@ export function SubscriptionsView({
 }: {
   initialSubscriptions: Subscription[];
 }) {
+  const { showToast, confirmAction } = useFeedback();
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -117,7 +119,11 @@ export function SubscriptionsView({
   const handleSaveNew = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || newAmount <= 0) {
-      alert("Nama layanan dan nominal wajib diisi!");
+      showToast({
+        variant: "warning",
+        title: "Data belum lengkap",
+        description: "Nama layanan dan biaya bulanan wajib diisi!",
+      });
       return;
     }
     try {
@@ -127,12 +133,22 @@ export function SubscriptionsView({
         amount: newAmount,
         billingDay: Number(newDay),
       });
+      const savedName = newName;
       setIsAddOpen(false);
       setNewName("");
       setNewAmount(0);
       setNewDay(1);
+      showToast({
+        variant: "success",
+        title: "Langganan ditambahkan!",
+        description: `${savedName} berhasil didaftarkan.`,
+      });
     } catch (err) {
-      alert("Gagal menambahkan langganan: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal menambahkan langganan",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
@@ -158,31 +174,69 @@ export function SubscriptionsView({
         isActive: editActive,
       });
       setEditingSub(null);
+      showToast({
+        variant: "success",
+        title: "Langganan diperbarui",
+        description: `Perubahan pada ${editName} telah disimpan.`,
+      });
     } catch (err) {
-      alert("Gagal memperbarui langganan: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal memperbarui langganan",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleToggleActive = async (sub: Subscription) => {
+    const nextState = !sub.isActive;
     try {
       setLoading(true);
-      await toggleSubscriptionStatusAction(sub.id, !sub.isActive);
+      await toggleSubscriptionStatusAction(sub.id, nextState);
+      showToast({
+        variant: nextState ? "success" : "info",
+        title: nextState ? "Langganan diaktifkan" : "Langganan dijeda",
+        description: nextState
+          ? `Pengingat tagihan ${sub.serviceName} diaktifkan kembali.`
+          : `Pengingat tagihan ${sub.serviceName} dijeda sementara.`,
+      });
     } catch (err) {
-      alert("Gagal mengubah status: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal mengubah status",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus langganan "${name}"?`)) return;
+    const confirmed = await confirmAction({
+      title: "Hapus Langganan?",
+      description: `Langganan "${name}" akan dihapus dari daftar pengingat Anda.`,
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
     try {
       setLoading(true);
       await deleteSubscriptionAction(id);
+      showToast({
+        variant: "success",
+        title: "Langganan dihapus",
+        description: `${name} telah dihapus dari daftar langganan.`,
+      });
     } catch (err) {
-      alert("Gagal menghapus: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal menghapus langganan",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }

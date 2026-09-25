@@ -4,12 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { forgotPasswordAction } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 export default function ForgotPasswordPage() {
+  const { showToast } = useFeedback();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,20 +17,28 @@ export default function ForgotPasswordPage() {
 
     try {
       setLoading(true);
-      setErrorMsg(null);
-      setSuccessMsg(null);
-
       const res = await forgotPasswordAction(email);
       if (!res.success) {
-        setErrorMsg(res.error || "Gagal mengirim link reset password.");
+        showToast({
+          variant: "error",
+          title: "Gagal mengirim link reset",
+          description: res.error || "Gagal mengirim link reset password.",
+        });
         return;
       }
 
-      setSuccessMsg(
-        "Link reset password telah dikirim ke email Anda. Silakan periksa kotak masuk atau spam Anda.",
-      );
+      showToast({
+        variant: "success",
+        title: "Link reset terkirim!",
+        description:
+          "Silakan periksa kotak masuk atau folder spam email Anda.",
+      });
     } catch {
-      setErrorMsg("Terjadi kendala. Silakan coba beberapa saat lagi.");
+      showToast({
+        variant: "error",
+        title: "Terjadi kendala",
+        description: "Silakan coba beberapa saat lagi.",
+      });
     } finally {
       setLoading(false);
     }
@@ -47,18 +55,6 @@ export default function ForgotPasswordPage() {
             Masukkan email Anda untuk menerima link reset
           </p>
         </div>
-
-        {errorMsg && (
-          <div className="mb-4 rounded-xl bg-red-50 p-3 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
-            {errorMsg}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-            {successMsg}
-          </div>
-        )}
 
         <form onSubmit={handleForgotPassword} className="space-y-4">
           <div>

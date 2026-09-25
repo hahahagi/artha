@@ -30,6 +30,7 @@ import {
   RefreshCw,
   Table as TableIcon,
 } from "lucide-react";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 interface Category {
   id: string;
@@ -71,26 +72,55 @@ export function SettingsView({
   const [sheetLoading, setSheetLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
 
+  const { showToast, confirmAction } = useFeedback();
+
   const handleGeneratePairing = async () => {
     try {
       setLoading(true);
       const res = await generatePairingTokenAction();
       setPairingData(res);
+      showToast({
+        variant: "info",
+        title: "Token pairing dibuat",
+        description: "Silakan klik tombol Buka Telegram untuk menautkan akun.",
+      });
     } catch (err) {
-      alert("Gagal membuat token pairing: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal membuat token pairing",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleUnlink = async () => {
-    if (!confirm("Putuskan tautan dengan bot Telegram ini?")) return;
+    const confirmed = await confirmAction({
+      title: "Putuskan Hubungan Telegram?",
+      description:
+        "Anda tidak dapat mencatat pengeluaran via Telegram sampai menautkan ulang akun ini.",
+      confirmText: "Ya, Putuskan",
+      cancelText: "Batal",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
     try {
       setLoading(true);
       await unlinkTelegramAction();
       setPairingData(null);
+      showToast({
+        variant: "info",
+        title: "Tautan Telegram diputuskan",
+        description: "Akun Telegram Anda telah dilepas dari dashboard ini.",
+      });
     } catch (err) {
-      alert("Gagal memutuskan tautan: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal memutuskan tautan",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
@@ -100,6 +130,11 @@ export function SettingsView({
     if (!pairingData) return;
     navigator.clipboard.writeText(pairingData.deepLink);
     setCopied(true);
+    showToast({
+      variant: "success",
+      title: "Tautan disalin!",
+      description: "Link pairing Telegram berhasil disalin ke clipboard.",
+    });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -109,22 +144,49 @@ export function SettingsView({
     try {
       setCatLoading(true);
       await createCategoryAction(newCatName, newCatKeywords);
+      const addedName = newCatName;
       setNewCatName("");
       setNewCatKeywords("");
+      showToast({
+        variant: "success",
+        title: "Kategori ditambahkan",
+        description: `Kategori "${addedName}" berhasil dibuat.`,
+      });
     } catch (err) {
-      alert("Gagal menambahkan kategori: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal menambahkan kategori",
+        description: (err as Error).message,
+      });
     } finally {
       setCatLoading(false);
     }
   };
 
   const handleDeleteCategory = async (id: string, name: string) => {
-    if (!confirm(`Hapus kategori "${name}"?`)) return;
+    const confirmed = await confirmAction({
+      title: "Hapus Kategori Kustom?",
+      description: `Kategori "${name}" akan dihapus. Transaksi terkait tidak akan ikut terhapus.`,
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
     try {
       setCatLoading(true);
       await deleteCategoryAction(id);
+      showToast({
+        variant: "success",
+        title: "Kategori dihapus",
+        description: `Kategori "${name}" berhasil dihapus.`,
+      });
     } catch (err) {
-      alert("Gagal menghapus kategori: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal menghapus kategori",
+        description: (err as Error).message,
+      });
     } finally {
       setCatLoading(false);
     }
@@ -137,22 +199,37 @@ export function SettingsView({
         googleSheetId: sheetId,
         googleSheetAutoSync: autoSync,
       });
-      alert("Pengaturan Google Sheets berhasil disimpan!");
+      showToast({
+        variant: "success",
+        title: "Pengaturan disimpan!",
+        description: "Konfigurasi Google Sheets berhasil diperbarui.",
+      });
     } catch (err) {
-      alert("Gagal menyimpan pengaturan: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal menyimpan pengaturan",
+        description: (err as Error).message,
+      });
     } finally {
       setSheetLoading(false);
     }
   };
+
   const handleManualSync = async () => {
     try {
       setSyncLoading(true);
       const res = await syncGoogleSheetsAction();
-      alert(
-        `Berhasil menyinkronkan ${res.count} pengeluaran ke Google Spreadsheet!`,
-      );
+      showToast({
+        variant: "success",
+        title: "Sinkronisasi selesai!",
+        description: `Berhasil menyinkronkan ${res.count} pengeluaran ke Google Sheets.`,
+      });
     } catch (err) {
-      alert("Gagal sinkronisasi: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal sinkronisasi",
+        description: (err as Error).message,
+      });
     } finally {
       setSyncLoading(false);
     }

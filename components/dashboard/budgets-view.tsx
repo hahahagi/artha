@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   AlertOctagon,
 } from "lucide-react";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 interface Category {
   id: string;
@@ -49,6 +50,7 @@ export function BudgetsView({
   totalBudget,
   totalSpent,
 }: BudgetsViewProps) {
+  const { showToast, confirmAction } = useFeedback();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [amountStr, setAmountStr] = useState("");
@@ -77,23 +79,55 @@ export function BudgetsView({
     try {
       setLoading(true);
       const amount = parseThousandInput(amountStr);
-      if (isNaN(amount) || amount <= 0) return;
+      if (isNaN(amount) || amount <= 0) {
+        showToast({
+          variant: "warning",
+          title: "Nominal tidak valid",
+          description: "Batas anggaran harus lebih besar dari Rp 0.",
+        });
+        return;
+      }
       await setBudgetAction(selectedCategoryId, amount);
       setModalOpen(false);
+      showToast({
+        variant: "success",
+        title: "Anggaran berhasil disimpan!",
+        description: `Batas anggaran diset ke ${formatCurrency(amount, "IDR")}.`,
+      });
     } catch {
-      alert("Gagal menyimpan anggaran.");
+      showToast({
+        variant: "error",
+        title: "Gagal menyimpan anggaran",
+        description: "Silakan coba lagi beberapa saat.",
+      });
     } finally {
       setLoading(false);
     }
   };
-
+  
   const handleDelete = async (id: string) => {
-    if (!confirm("Hapus batas anggaran untuk kategori ini?")) return;
+    const confirmed = await confirmAction({
+      title: "Hapus Batas Anggaran?",
+      description: "Batas anggaran untuk kategori ini akan dihapus.",
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+    });
+    if (!confirmed) return;
     try {
       setLoading(true);
       await deleteBudgetAction(id);
+      showToast({
+        variant: "success",
+        title: "Anggaran dihapus",
+        description: "Batas anggaran kategori berhasil dihapus.",
+      });
     } catch {
-      alert("Gagal menghapus anggaran.");
+      showToast({
+        variant: "error",
+        title: "Gagal menghapus anggaran",
+        description: "Silakan coba lagi.",
+      });
     } finally {
       setLoading(false);
     }

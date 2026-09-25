@@ -5,28 +5,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { registerWithEmailAction } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { showToast } = useFeedback();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
 
     if (password.length < 8) {
-      setErrorMsg("Password minimal 8 karakter.");
+      showToast({
+        variant: "warning",
+        title: "Password terlalu pendek",
+        description: "Password minimal 8 karakter.",
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMsg("Konfirmasi password tidak cocok.");
+      showToast({
+        variant: "warning",
+        title: "Password tidak cocok",
+        description: "Konfirmasi password tidak cocok.",
+      });
       return;
     }
 
@@ -35,20 +41,36 @@ export default function RegisterPage() {
       const res = await registerWithEmailAction(email, password);
 
       if (!res.success) {
-        setErrorMsg(res.error || "Pendaftaran gagal. Silakan coba lagi.");
+        showToast({
+          variant: "error",
+          title: "Pendaftaran gagal",
+          description: res.error || "Pendaftaran gagal. Silakan coba lagi.",
+        });
         return;
       }
 
       if (res.needsConfirmation) {
-        setSuccessMsg(
-          "Pendaftaran berhasil! Silakan cek kotak masuk email Anda untuk mengonfirmasi pendaftaran sebelum masuk."
-        );
+        showToast({
+          variant: "success",
+          title: "Pendaftaran berhasil!",
+          description:
+            "Silakan cek kotak masuk email Anda untuk mengonfirmasi pendaftaran.",
+        });
       } else {
+        showToast({
+          variant: "success",
+          title: "Akun berhasil dibuat!",
+          description: "Selamat datang di Artha.",
+        });
         router.push("/");
         router.refresh();
       }
     } catch {
-      setErrorMsg("Terjadi kendala saat mendaftar. Silakan coba lagi.");
+      showToast({
+        variant: "error",
+        title: "Gagal mendaftar",
+        description: "Terjadi kendala saat mendaftar. Silakan coba lagi.",
+      });
     } finally {
       setLoading(false);
     }
@@ -65,18 +87,6 @@ export default function RegisterPage() {
             Buat akun baru Anda
           </p>
         </div>
-
-        {errorMsg && (
-          <div className="mb-4 rounded-xl bg-red-50 p-3 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
-            {errorMsg}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-            {successMsg}
-          </div>
-        )}
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div>

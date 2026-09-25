@@ -4,26 +4,24 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const { showToast } = useFeedback();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [validatingSession, setValidatingSession] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const hasExchangedRef = useRef(false);
   useEffect(() => {
-    // Mencegah React Strict Mode menjalankan kode dua kali
     if (hasExchangedRef.current) return;
     hasExchangedRef.current = true;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const exchangeCode = async () => {
       const supabase = createClient();
-      // Cek jika sesi sudah aktif
       const { data: sessionData } = await supabase.auth.getSession();
       if (sessionData.session) {
         setValidatingSession(false);
@@ -32,38 +30,49 @@ export default function ResetPasswordPage() {
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
-          // Periksa kembali barangkali sesi sudah terbentuk
           const { data: checkData } = await supabase.auth.getSession();
           if (!checkData.session) {
-            setErrorMsg(
-              "Link reset password tidak valid atau sudah kadaluarsa. Silakan minta link baru.",
-            );
+            showToast({
+              variant: "error",
+              title: "Link kadaluarsa",
+              description:
+                "Link reset password tidak valid atau sudah kadaluarsa. Silakan minta link baru.",
+            });
           }
         } else {
-          // Bersihkan kode dari URL agar URL bersih
           window.history.replaceState({}, "", window.location.pathname);
         }
       } else {
-        setErrorMsg(
-          "Tidak ada sesi reset password aktif. Silakan minta link baru melalui halaman Lupa Password.",
-        );
+        showToast({
+          variant: "warning",
+          title: "Sesi tidak ditemukan",
+          description:
+            "Tidak ada sesi reset password aktif. Silakan minta link baru melalui halaman Lupa Password.",
+        });
       }
       setValidatingSession(false);
     };
     exchangeCode();
-  }, []);
+  }, [showToast]);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
 
     if (password.length < 8) {
-      setErrorMsg("Password minimal 8 karakter.");
+      showToast({
+        variant: "warning",
+        title: "Password terlalu pendek",
+        description: "Password minimal 8 karakter.",
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMsg("Konfirmasi password baru tidak cocok.");
+      showToast({
+        variant: "warning",
+        title: "Password tidak cocok",
+        description: "Konfirmasi password baru tidak cocok.",
+      });
       return;
     }
 
@@ -71,22 +80,31 @@ export default function ResetPasswordPage() {
       setLoading(true);
       const supabase = createClient();
 
-      // Perbarui password pengguna secara langsung
       const { error } = await supabase.auth.updateUser({
         password,
       });
 
       if (error) {
-        setErrorMsg(error.message);
+        showToast({
+          variant: "error",
+          title: "Gagal memperbarui password",
+          description: error.message,
+        });
         return;
       }
 
-      setSuccessMsg("Password berhasil diperbarui! Mengalihkan ke login...");
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
+      showToast({
+        variant: "success",
+        title: "Password berhasil diperbarui!",
+        description: "Silakan masuk dengan password baru Anda.",
+      });
+      router.push("/login");
     } catch {
-      setErrorMsg("Terjadi kendala saat memperbarui password.");
+      showToast({
+        variant: "error",
+        title: "Gagal memperbarui password",
+        description: "Terjadi kendala saat memperbarui password.",
+      });
     } finally {
       setLoading(false);
     }
@@ -103,18 +121,6 @@ export default function ResetPasswordPage() {
             Masukkan password baru untuk akun Anda
           </p>
         </div>
-
-        {errorMsg && (
-          <div className="mb-4 rounded-xl bg-red-50 p-3 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
-            {errorMsg}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-            {successMsg}
-          </div>
-        )}
 
         <form onSubmit={handleReset} className="space-y-4">
           <div>

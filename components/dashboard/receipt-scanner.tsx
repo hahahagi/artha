@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, Upload, X, Check, Loader2, RefreshCw } from "lucide-react";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 interface ReceiptScannerProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export function ReceiptScanner({
   onClose,
   onApply,
 }: ReceiptScannerProps) {
+  const { showToast } = useFeedback();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -45,7 +47,6 @@ export function ReceiptScanner({
     setStatusMessage("Menyiapkan OCR engine...");
 
     try {
-      // Dynamic import Tesseract agar tidak membebani initial bundle
       const { createWorker } = await import("tesseract.js");
       const worker = await createWorker("ind+eng", undefined, {
         logger: (m) => {
@@ -72,14 +73,28 @@ export function ReceiptScanner({
           : "Belanja Struk";
         setDetectedItem(title);
         setDetectedAmount(parsed.totalAmount);
+        showToast({
+          variant: "success",
+          title: "Struk berhasil dipindai!",
+          description: `Terdeteksi ${title} — ${formatCurrency(parsed.totalAmount, "IDR")}`,
+        });
       } else {
         setDetectedItem("Belanja Struk");
         setDetectedAmount(0);
+        showToast({
+          variant: "warning",
+          title: "Nominal belum terbaca otomatis",
+          description: "Silakan isi atau koreksi nominal struk secara manual.",
+        });
       }
       setScanDone(true);
     } catch (err) {
       console.error("[OCR Error]:", err);
-      alert("Gagal memproses struk. Silakan coba foto yang lebih jelas.");
+      showToast({
+        variant: "error",
+        title: "Gagal memproses struk",
+        description: "Silakan coba gunakan foto struk yang lebih jelas.",
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -96,12 +111,21 @@ export function ReceiptScanner({
 
   const handleConfirm = () => {
     if (detectedAmount <= 0) {
-      alert("Nominal tidak valid atau belum terdeteksi.");
+      showToast({
+        variant: "warning",
+        title: "Nominal tidak valid",
+        description: "Masukkan nominal total struk terlebih dahulu.",
+      });
       return;
     }
     onApply({
       itemName: detectedItem || "Belanja Struk",
       amount: detectedAmount,
+    });
+    showToast({
+      variant: "info",
+      title: "Data struk diterapkan",
+      description: "Silakan pilih kategori lalu klik Simpan Transaksi.",
     });
     handleReset();
     onClose();

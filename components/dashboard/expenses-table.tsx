@@ -31,9 +31,10 @@ import {
   X,
   Receipt,
   Download,
+  Camera,
 } from "lucide-react";
 import { ReceiptScanner } from "@/components/dashboard/receipt-scanner";
-import { Camera } from "lucide-react";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 interface Category {
   id: string;
@@ -59,6 +60,7 @@ export function ExpensesTable({
   initialExpenses: Expense[];
   categories: Category[];
 }) {
+  const { showToast, confirmAction } = useFeedback();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [sortOption, setSortOption] = useState<
@@ -123,7 +125,14 @@ export function ExpensesTable({
   };
 
   const handleSaveEdit = async () => {
-    if (!editingExpense || !editItemName.trim() || editAmount <= 0) return;
+    if (!editingExpense || !editItemName.trim() || editAmount <= 0) {
+      showToast({
+        variant: "warning",
+        title: "Data belum lengkap",
+        description: "Nama barang dan nominal harus lebih dari 0.",
+      });
+      return;
+    }
     try {
       setLoading(true);
       await updateExpenseAction(editingExpense.id, {
@@ -132,20 +141,46 @@ export function ExpensesTable({
         categoryId: editCategoryId || undefined,
       });
       setEditingExpense(null);
+      showToast({
+        variant: "success",
+        title: "Pengeluaran diperbarui",
+        description: `${editItemName} (${formatCurrency(editAmount, "IDR")}) berhasil disimpan.`,
+      });
     } catch (err) {
-      alert("Gagal memperbarui transaksi: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal memperbarui transaksi",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus catatan pengeluaran "${name}"?`)) return;
+    const confirmed = await confirmAction({
+      title: "Hapus Pengeluaran?",
+      description: `Catatan pengeluaran "${name}" akan dihapus permanen.`,
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
     try {
       setLoading(true);
       await deleteExpenseAction(id);
+      showToast({
+        variant: "success",
+        title: "Pengeluaran dihapus",
+        description: `Catatan "${name}" telah dihapus.`,
+      });
     } catch (err) {
-      alert("Gagal menghapus transaksi: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal menghapus transaksi",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
@@ -153,7 +188,11 @@ export function ExpensesTable({
 
   const handleSaveNew = async () => {
     if (!newItemName.trim() || newAmount <= 0) {
-      alert("Nama barang dan nominal wajib diisi!");
+      showToast({
+        variant: "warning",
+        title: "Data belum lengkap",
+        description: "Nama barang dan nominal wajib diisi!",
+      });
       return;
     }
     try {
@@ -163,15 +202,35 @@ export function ExpensesTable({
         amount: newAmount,
         categoryId: newCategoryId || undefined,
       });
+      const savedName = newItemName;
+      const savedAmount = newAmount;
       setIsAddOpen(false);
       setNewItemName("");
       setNewAmount(0);
       setNewCategoryId("");
+      showToast({
+        variant: "success",
+        title: "Pengeluaran berhasil dicatat!",
+        description: `${savedName} — ${formatCurrency(savedAmount, "IDR")}`,
+      });
     } catch (err) {
-      alert("Gagal mencatat transaksi: " + (err as Error).message);
+      showToast({
+        variant: "error",
+        title: "Gagal mencatat transaksi",
+        description: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    showToast({
+      variant: "info",
+      title: "Mengunduh CSV...",
+      description: "Laporan pengeluaran Anda sedang disiapkan.",
+    });
+    window.open("/api/export/expenses", "_blank");
   };
 
   return (
@@ -238,7 +297,7 @@ export function ExpensesTable({
           {/* Tombol Export CSV */}
           <Button
             variant="outline"
-            onClick={() => window.open("/api/export/expenses", "_blank")}
+            onClick={handleExportCsv}
             className="gap-2 rounded-xl text-xs font-medium"
           >
             <Download className="h-4 w-4" />
@@ -494,6 +553,7 @@ export function ExpensesTable({
           </div>
         </div>
       )}
+
       {/* Modal Scanner Struk OCR */}
       <ReceiptScanner
         isOpen={isScannerOpen}

@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loginWithEmailAction } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { showToast } = useFeedback();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,18 +21,30 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      setErrorMsg(null);
       const res = await loginWithEmailAction(email, password);
 
       if (!res.success) {
-        setErrorMsg(res.error || "Email atau password salah.");
+        showToast({
+          variant: "error",
+          title: "Gagal masuk",
+          description: res.error || "Email atau password salah.",
+        });
         return;
       }
 
+      showToast({
+        variant: "success",
+        title: "Berhasil masuk!",
+        description: "Selamat datang kembali di Artha.",
+      });
       router.push("/");
       router.refresh();
     } catch {
-      setErrorMsg("Terjadi kendala saat login. Silakan coba lagi.");
+      showToast({
+        variant: "error",
+        title: "Gagal masuk",
+        description: "Terjadi kendala saat login. Silakan coba lagi.",
+      });
     } finally {
       setLoading(false);
     }
@@ -40,7 +53,6 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
-      setErrorMsg(null);
       const supabase = createClient();
 
       const { error } = await supabase.auth.signInWithOAuth({
@@ -51,12 +63,20 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setErrorMsg(error.message);
+        showToast({
+          variant: "error",
+          title: "Gagal masuk dengan Google",
+          description: error.message,
+        });
       }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Gagal melakukan login.";
-      setErrorMsg(message);
+      showToast({
+        variant: "error",
+        title: "Gagal masuk",
+        description: message,
+      });
     } finally {
       setLoading(false);
     }
@@ -73,12 +93,6 @@ export default function LoginPage() {
             Masuk ke akun Anda
           </p>
         </div>
-
-        {errorMsg && (
-          <div className="mb-4 rounded-xl bg-red-50 p-3 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
-            {errorMsg}
-          </div>
-        )}
 
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <div>

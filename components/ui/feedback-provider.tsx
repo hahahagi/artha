@@ -4,9 +4,11 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   CheckCircle2,
   AlertCircle,
@@ -26,6 +28,7 @@ export interface ToastOptions {
 
 interface ToastItem extends ToastOptions {
   id: string;
+  expiresAt: number;
 }
 
 export interface ConfirmOptions {
@@ -45,6 +48,8 @@ interface FeedbackContextValue {
   confirmAction: (options: ConfirmOptions) => Promise<boolean>;
 }
 
+const STORAGE_KEY = "artha_active_toasts";
+
 const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 
 export function useFeedback(): FeedbackContextValue {
@@ -55,13 +60,38 @@ export function useFeedback(): FeedbackContextValue {
   return ctx;
 }
 
+function saveToastsToStorage(items: ToastItem[]) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // Abaikan jika sessionStorage tidak tersedia
+  }
+}
+
+function loadToastsFromStorage(): ToastItem[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ToastItem[];
+    const now = Date.now();
+    return parsed.filter((item) => item.expiresAt > now);
+  } catch {
+    return [];
+  }
+}
+
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const counterRef = useRef(0);
 
   const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((item) => item.id !== id));
+    setToasts((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      saveToastsToStorage(next);
+      return next;
+    });
   }, []);
 
   const showToast = useCallback(
@@ -73,7 +103,21 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     }: ToastOptions) => {
       counterRef.current += 1;
       const id = `toast-${Date.now()}-${counterRef.current}`;
-      setToasts((prev) => [...prev, { id, title, description, variant, duration }]);
+      const expiresAt = Date.now() + duration;
+      const newItem: ToastItem = {
+        id,
+        title,
+        description,
+        variant,
+        duration,
+        expiresAt,
+      };
+
+      setToasts((prev) => {
+        const next = [...prev, newItem];
+        saveToastsToStorage(next);
+        return next;
+      });
 
       if (duration > 0) {
         setTimeout(() => {
@@ -81,17 +125,75 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
         }, duration);
       }
     },
-    [dismissToast]
+    [dismissToast],
   );
 
-  const confirmAction = useCallback((options: ConfirmOptions): Promise<boolean> => {
-    return new Promise<boolean>((resolve) => {
-      setConfirmState({
-        ...options,
-        resolve,
+  // Pulihkan toast dari sessionStorage & cek query param hasil redirect OAuth setiap ganti halaman
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const syncTimer = setTimeout(() => {
+      const stored = loadToastsFromStorage();
+      if (stored.length > 0) {
+        setToasts(stored);
+        saveToastsToStorage(stored);
+        const now = Date.now();
+        stored.forEach((t) => {
+          timers.push(
+            setTimeout(
+              () => dismissToast(t.id),
+              Math.max(t.expiresAt - now, 500),
+            ),
+          );
+        });
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const loginParam = params.get("login");
+      const errorParam = params.get("error");
+
+      if (loginParam === "success") {
+        showToast({
+          variant: "success",
+          title: "Berhasil masuk!",
+          description: "Selamat datang kembali di Artha.",
+        });
+        params.delete("login");
+        const cleanUrl =
+          window.location.pathname +
+          (params.toString() ? `?${params.toString()}` : "");
+        window.history.replaceState({}, "", cleanUrl);
+      } else if (errorParam === "auth_failed") {
+        showToast({
+          variant: "error",
+          title: "Gagal masuk",
+          description: "Autentikasi gagal atau dibatalkan. Silakan coba lagi.",
+        });
+        params.delete("error");
+        const cleanUrl =
+          window.location.pathname +
+          (params.toString() ? `?${params.toString()}` : "");
+        window.history.replaceState({}, "", cleanUrl);
+      }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+      timers.forEach(clearTimeout);
+    };
+  }, [pathname, dismissToast, showToast]);
+
+  const confirmAction = useCallback(
+    (options: ConfirmOptions): Promise<boolean> => {
+      return new Promise<boolean>((resolve) => {
+        setConfirmState({
+          ...options,
+          resolve,
+        });
       });
-    });
-  }, []);
+    },
+    [],
+  );
 
   const handleConfirmResult = (result: boolean) => {
     if (confirmState) {

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getEmailUsername } from "@/lib/utils/format";
+import { useFeedback } from "@/components/ui/feedback-provider";
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -25,11 +26,26 @@ const NAV_ITEMS = [
 export function DashboardSidebar({ userEmail }: { userEmail?: string }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { showToast, confirmAction } = useFeedback();
 
   const handleSignOut = async () => {
+    const confirmed = await confirmAction({
+      title: "Keluar dari Akun?",
+      description: "Apakah Anda yakin ingin keluar dari sesi Artha saat ini?",
+      confirmText: "Ya, Keluar",
+      cancelText: "Batal",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
     sessionStorage.removeItem("pwa_prompt_shown_in_session");
     const supabase = createClient();
     await supabase.auth.signOut();
+    showToast({
+      variant: "info",
+      title: "Berhasil keluar",
+      description: "Sampai jumpa kembali!",
+    });
     router.push("/login");
     router.refresh();
   };
