@@ -22,12 +22,20 @@ export function PwaInstallPrompt() {
       (window.navigator as unknown as { standalone?: boolean }).standalone ===
         true;
 
-    if (isStandalone) return;
+    if (isStandalone) {
+      localStorage.setItem("pwa_already_installed", "true");
+      return;
+    }
 
     // 2. Jangan tampilkan jika sudah pernah berhasil diinstall sebelumnya
     if (localStorage.getItem("pwa_already_installed") === "true") return;
 
-    // 3. Jangan munculkan jika user menutup pop-up dalam 7 hari terakhir
+    // 3. Jangan tampilkan lagi jika sudah pernah muncul pada sesi login ini (saat pindah halaman)
+    if (sessionStorage.getItem("pwa_prompt_shown_in_session") === "true") {
+      return;
+    }
+
+    // 4. Jangan munculkan jika user menutup pop-up dalam 7 hari terakhir
     const dismissedTime = localStorage.getItem("pwa_install_dismissed");
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
     if (dismissedTime && Date.now() - Number(dismissedTime) < SEVEN_DAYS_MS) {
@@ -40,19 +48,33 @@ export function PwaInstallPrompt() {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
 
-      // Beri jeda 4 detik setelah halaman dimuat agar tidak mengagetkan pengguna
+      // Pastikan hanya dijadwalkan sekali per sesi login
+      if (sessionStorage.getItem("pwa_prompt_shown_in_session") === "true") {
+        return;
+      }
+
+      // Beri jeda 4 detik setelah halaman pertama kali dimuat
       timer = setTimeout(() => {
+        sessionStorage.setItem("pwa_prompt_shown_in_session", "true");
         setShowPrompt(true);
       }, 4000);
     };
 
+    const handleAppInstalled = () => {
+      localStorage.setItem("pwa_already_installed", "true");
+      setDeferredPrompt(null);
+      setShowPrompt(false);
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
         handleBeforeInstallPrompt,
       );
+      window.removeEventListener("appinstalled", handleAppInstalled);
       if (timer) clearTimeout(timer);
     };
   }, []);

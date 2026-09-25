@@ -30,6 +30,7 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
   const router = useRouter();
 
   const handleSignOut = async () => {
+    sessionStorage.removeItem("pwa_prompt_shown_in_session");
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
@@ -49,7 +50,9 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
           </button>
           <div className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            <span className="font-bold text-zinc-900 dark:text-zinc-50">Artha</span>
+            <span className="font-bold text-zinc-900 dark:text-zinc-50">
+              Artha
+            </span>
           </div>
         </div>
 

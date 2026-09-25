@@ -26,6 +26,7 @@ export function DashboardSidebar({ userEmail }: { userEmail?: string }) {
   const router = useRouter();
 
   const handleSignOut = async () => {
+    sessionStorage.removeItem("pwa_prompt_shown_in_session");
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
