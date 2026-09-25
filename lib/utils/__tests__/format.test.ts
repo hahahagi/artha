@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { formatCurrency } from "../format";
+import {
+  formatCurrency,
+  formatThousandInput,
+  parseThousandInput,
+} from "../format";
 
 describe("Format Currency Utility", () => {
   describe("Mata Uang Rupiah (IDR)", () => {
@@ -69,6 +73,27 @@ describe("Format Currency Utility", () => {
     it("menangani karakter simbol yang memicu error Intl", () => {
       const res = formatCurrency(999, "123!@#");
       expect(res).toContain("999");
+    });
+  });
+
+  describe("Thousand Separator Input Helper", () => {
+    it("memformat angka ribuan dan jutaan dengan titik otomatis", () => {
+      expect(formatThousandInput(500)).toBe("500");
+      expect(formatThousandInput(25000)).toBe("25.000");
+      expect(formatThousandInput("1500000")).toBe("1.500.000");
+      expect(formatThousandInput("Rp 75.000")).toBe("75.000");
+    });
+
+    it("mengembalikan string kosong untuk 0 atau input kosong", () => {
+      expect(formatThousandInput(0)).toBe("");
+      expect(formatThousandInput("")).toBe("");
+      expect(formatThousandInput("abc")).toBe("");
+    });
+
+    it("mem-parsing string bertitik kembali menjadi number murni", () => {
+      expect(parseThousandInput("25.000")).toBe(25000);
+      expect(parseThousandInput("1.500.000")).toBe(1500000);
+      expect(parseThousandInput("")).toBe(0);
     });
   });
 });

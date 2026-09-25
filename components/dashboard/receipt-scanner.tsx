@@ -2,7 +2,11 @@
 
 import { useState, useRef } from "react";
 import { parseReceiptText } from "@/lib/parser/receipt-parser";
-import { formatCurrency } from "@/lib/utils/format";
+import {
+  formatCurrency,
+  formatThousandInput,
+  parseThousandInput,
+} from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, Upload, X, Check, Loader2, RefreshCw } from "lucide-react";
@@ -199,12 +203,13 @@ export function ReceiptScanner({
                       Nominal Total (Rp)
                     </label>
                     <Input
-                      type="number"
-                      value={detectedAmount || ""}
+                      type="text"
+                      inputMode="numeric"
+                      value={formatThousandInput(detectedAmount)}
                       onChange={(e) =>
-                        setDetectedAmount(parseInt(e.target.value, 10) || 0)
+                        setDetectedAmount(parseThousandInput(e.target.value))
                       }
-                      placeholder="Contoh: 50000"
+                      placeholder="Contoh: 50.000"
                       className="mt-1"
                     />
                     {detectedAmount > 0 && (

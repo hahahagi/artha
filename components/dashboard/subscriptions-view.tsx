@@ -11,7 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils/format";
+import {
+  formatCurrency,
+  formatThousandInput,
+  parseThousandInput,
+} from "@/lib/utils/format";
 import {
   createSubscriptionAction,
   updateSubscriptionAction,
@@ -427,10 +431,13 @@ export function SubscriptionsView({
                   Biaya Bulanan (Rupiah)
                 </label>
                 <Input
-                  type="number"
-                  placeholder="54000"
-                  value={newAmount || ""}
-                  onChange={(e) => setNewAmount(Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Contoh: 54.000"
+                  value={formatThousandInput(newAmount)}
+                  onChange={(e) =>
+                    setNewAmount(parseThousandInput(e.target.value))
+                  }
                   required
                 />
               </div>
@@ -496,9 +503,13 @@ export function SubscriptionsView({
                   Biaya Bulanan (Rupiah)
                 </label>
                 <Input
-                  type="number"
-                  value={editAmount}
-                  onChange={(e) => setEditAmount(Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Contoh: 54.000"
+                  value={formatThousandInput(editAmount)}
+                  onChange={(e) =>
+                    setEditAmount(parseThousandInput(e.target.value))
+                  }
                   required
                 />
               </div>

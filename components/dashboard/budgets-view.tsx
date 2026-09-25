@@ -1,11 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { formatCurrency } from "@/lib/utils/format";
-import { setBudgetAction, deleteBudgetAction } from "@/app/(dashboard)/budgets/actions";
+import {
+  formatCurrency,
+  formatThousandInput,
+  parseThousandInput,
+} from "@/lib/utils/format";
+import {
+  setBudgetAction,
+  deleteBudgetAction,
+} from "@/app/(dashboard)/budgets/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PiggyBank, Plus, Trash2, Pencil, AlertTriangle, CheckCircle2, AlertOctagon } from "lucide-react";
+import {
+  PiggyBank,
+  Plus,
+  Trash2,
+  Pencil,
+  AlertTriangle,
+  CheckCircle2,
+  AlertOctagon,
+} from "lucide-react";
 
 interface Category {
   id: string;
@@ -40,7 +55,9 @@ export function BudgetsView({
   const [loading, setLoading] = useState(false);
 
   const budgetCategoryIds = new Set(budgets.map((b) => b.categoryId));
-  const unbudgetedCategories = categories.filter((c) => !budgetCategoryIds.has(c.id));
+  const unbudgetedCategories = categories.filter(
+    (c) => !budgetCategoryIds.has(c.id),
+  );
 
   const handleOpenAdd = (catId?: string) => {
     setSelectedCategoryId(catId || unbudgetedCategories[0]?.id || "");
@@ -50,19 +67,17 @@ export function BudgetsView({
 
   const handleOpenEdit = (budget: Budget) => {
     setSelectedCategoryId(budget.categoryId || "");
-    setAmountStr(budget.amount.toString());
+    setAmountStr(formatThousandInput(budget.amount));
     setModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCategoryId || !amountStr) return;
-
     try {
       setLoading(true);
-      const amount = parseInt(amountStr.replace(/\D/g, ""), 10);
+      const amount = parseThousandInput(amountStr);
       if (isNaN(amount) || amount <= 0) return;
-
       await setBudgetAction(selectedCategoryId, amount);
       setModalOpen(false);
     } catch {
@@ -93,7 +108,8 @@ export function BudgetsView({
             Anggaran Bulanan
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Atur batas pengeluaran per kategori agar arus kas Anda tetap terkendali.
+            Atur batas pengeluaran per kategori agar arus kas Anda tetap
+            terkendali.
           </p>
         </div>
         {unbudgetedCategories.length > 0 && (
@@ -166,10 +182,15 @@ export function BudgetsView({
             <PiggyBank className="mx-auto h-8 w-8 text-zinc-400 mb-2" />
             <h3 className="font-semibold text-sm">Belum Ada Anggaran</h3>
             <p className="text-xs text-zinc-500 mt-1 mb-4">
-              Tentukan batas belanja bulanan Anda agar bot dapat memberi peringatan saat mendekati batas.
+              Tentukan batas belanja bulanan Anda agar bot dapat memberi
+              peringatan saat mendekati batas.
             </p>
             {categories.length > 0 && (
-              <Button size="sm" onClick={() => handleOpenAdd()} className="rounded-xl text-xs">
+              <Button
+                size="sm"
+                onClick={() => handleOpenAdd()}
+                className="rounded-xl text-xs"
+              >
                 Pasang Anggaran Pertama
               </Button>
             )}
@@ -178,7 +199,8 @@ export function BudgetsView({
           <div className="grid gap-4 sm:grid-cols-2">
             {budgets.map((b) => {
               const spent = spentMap[b.categoryId || ""] || 0;
-              const percent = b.amount > 0 ? Math.round((spent / b.amount) * 100) : 0;
+              const percent =
+                b.amount > 0 ? Math.round((spent / b.amount) * 100) : 0;
               const isOver = percent >= 100;
               const isWarning = percent >= 80 && percent < 100;
 
@@ -195,15 +217,18 @@ export function BudgetsView({
                       <div className="mt-1 flex items-center gap-2">
                         {isOver ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-950/50 dark:text-red-400">
-                            <AlertOctagon className="h-3 w-3" /> Melebihi Batas ({percent}%)
+                            <AlertOctagon className="h-3 w-3" /> Melebihi Batas
+                            ({percent}%)
                           </span>
                         ) : isWarning ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
-                            <AlertTriangle className="h-3 w-3" /> Mendekati Batas ({percent}%)
+                            <AlertTriangle className="h-3 w-3" /> Mendekati
+                            Batas ({percent}%)
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                            <CheckCircle2 className="h-3 w-3" /> Aman ({percent}%)
+                            <CheckCircle2 className="h-3 w-3" /> Aman ({percent}
+                            %)
                           </span>
                         )}
                       </div>
@@ -237,16 +262,20 @@ export function BudgetsView({
                           isOver
                             ? "bg-red-500"
                             : isWarning
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
                         }`}
                         style={{ width: `${Math.min(percent, 100)}%` }}
                       />
                     </div>
 
                     <div className="flex justify-between text-xs text-zinc-500 dark:text-zinc-400 pt-1">
-                      <span>Terpakai: <b>{formatCurrency(spent, "IDR")}</b></span>
-                      <span>Batas: <b>{formatCurrency(b.amount, "IDR")}</b></span>
+                      <span>
+                        Terpakai: <b>{formatCurrency(spent, "IDR")}</b>
+                      </span>
+                      <span>
+                        Batas: <b>{formatCurrency(b.amount, "IDR")}</b>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -288,10 +317,13 @@ export function BudgetsView({
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   required
                   placeholder="Contoh: 1.000.000"
                   value={amountStr}
-                  onChange={(e) => setAmountStr(e.target.value)}
+                  onChange={(e) =>
+                    setAmountStr(formatThousandInput(e.target.value))
+                  }
                   className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>

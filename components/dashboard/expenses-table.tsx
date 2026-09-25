@@ -12,7 +12,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatCurrency } from "@/lib/utils/format";
+import {
+  formatCurrency,
+  formatThousandInput,
+  parseThousandInput,
+} from "@/lib/utils/format";
 import {
   createExpenseAction,
   updateExpenseAction,
@@ -375,10 +379,13 @@ export function ExpensesTable({
                   Nominal (Rupiah)
                 </label>
                 <Input
-                  type="number"
-                  placeholder="25000"
-                  value={newAmount || ""}
-                  onChange={(e) => setNewAmount(Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Contoh: 25.000"
+                  value={formatThousandInput(newAmount)}
+                  onChange={(e) =>
+                    setNewAmount(parseThousandInput(e.target.value))
+                  }
                 />
               </div>
               <div>
@@ -445,9 +452,13 @@ export function ExpensesTable({
                   Nominal (Rupiah)
                 </label>
                 <Input
-                  type="number"
-                  value={editAmount}
-                  onChange={(e) => setEditAmount(Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Contoh: 25.000"
+                  value={formatThousandInput(editAmount)}
+                  onChange={(e) =>
+                    setEditAmount(parseThousandInput(e.target.value))
+                  }
                 />
               </div>
               <div>
