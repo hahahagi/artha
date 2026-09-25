@@ -1,5 +1,6 @@
 "use server";
 
+import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { seedUserDefaultCategories } from "@/lib/db/seed-categories";
@@ -9,14 +10,12 @@ import { seedUserDefaultCategories } from "@/lib/db/seed-categories";
  */
 function getAppBaseUrl(): string {
   const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  // Gunakan NEXT_PUBLIC_APP_URL jika ada dan bukan localhost saat berjalan di Vercel
   if (
     configuredUrl &&
     (!process.env.VERCEL || !configuredUrl.includes("localhost"))
   ) {
     return configuredUrl.replace(/\/$/, "");
   }
-  // Otomatis gunakan domain production utama dari Vercel jika tersedia
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }
@@ -42,7 +41,6 @@ export async function loginWithEmailAction(email: string, password: string) {
     }
 
     if (data.user?.email) {
-      // Pastikan data user ada di Prisma dan kategorinya ter-seed
       const dbUser = await prisma.user.upsert({
         where: { email: data.user.email },
         update: {},
@@ -59,38 +57,81 @@ export async function loginWithEmailAction(email: string, password: string) {
 }
 
 /**
- * Pendaftaran Akun Baru dengan Email & Password
+ * Pendaftaran Akun Baru dengan Email & Password (Langsung Aktif & Auto-Login Tanpa Konfirmasi Email)
  */
 export async function registerWithEmailAction(email: string, password: string) {
   try {
     const supabase = await createClient();
-    const appUrl = getAppBaseUrl();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${appUrl}/callback`,
-      },
-    });
+    const hasValidServiceRole =
+      Boolean(supabaseUrl) &&
+      Boolean(serviceRoleKey) &&
+      serviceRoleKey !== "your-service-role-key";
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    if (data.user?.email) {
-      const dbUser = await prisma.user.upsert({
-        where: { email: data.user.email },
-        update: {},
-        create: { email: data.user.email },
+    if (hasValidServiceRole && supabaseUrl && serviceRoleKey) {
+      // 1. Buat user via Admin API dengan email_confirm: true (tidak mengirim email verifikasi)
+      const supabaseAdmin = createSupabaseAdmin(supabaseUrl, serviceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
       });
-      await seedUserDefaultCategories(dbUser.id);
+
+      const { error: adminError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+
+      if (adminError) {
+        return { success: false, error: adminError.message };
+      }
+    } else {
+      // 2. Fallback jika SUPABASE_SERVICE_ROLE_KEY belum diisi: signUp standar lalu auto-confirm via DB
+      const { data: signUpData, error: signUpError } =
+        await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+      if (signUpError) {
+        return { success: false, error: signUpError.message };
+      }
+
+      if (signUpData.user?.id && !signUpData.session) {
+        await prisma.$executeRaw`
+          UPDATE auth.users
+          SET email_confirmed_at = NOW(),
+              updated_at = NOW()
+          WHERE id = ${signUpData.user.id}::uuid
+            AND email_confirmed_at IS NULL
+        `;
+      }
     }
 
-    // Jika Supabase memerlukan konfirmasi email (data.session null)
+    // 3. Langsung login agar session cookie terbentuk dan user otomatis masuk ke Dashboard
+    const { data: signInData, error: signInError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (signInError) {
+      return { success: false, error: signInError.message };
+    }
+
+    const userEmail = signInData.user?.email || email;
+    const dbUser = await prisma.user.upsert({
+      where: { email: userEmail },
+      update: {},
+      create: { email: userEmail },
+    });
+    await seedUserDefaultCategories(dbUser.id);
+
     return {
       success: true,
-      needsConfirmation: !data.session,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Gagal mendaftar.";

@@ -49,22 +49,13 @@ export default function RegisterPage() {
         return;
       }
 
-      if (res.needsConfirmation) {
-        showToast({
-          variant: "success",
-          title: "Pendaftaran berhasil!",
-          description:
-            "Silakan cek kotak masuk email Anda untuk mengonfirmasi pendaftaran.",
-        });
-      } else {
-        showToast({
-          variant: "success",
-          title: "Akun berhasil dibuat!",
-          description: "Selamat datang di Artha.",
-        });
-        router.push("/");
-        router.refresh();
-      }
+      showToast({
+        variant: "success",
+        title: "Akun berhasil dibuat!",
+        description: "Selamat datang di Artha.",
+      });
+      router.push("/");
+      router.refresh();
     } catch {
       showToast({
         variant: "error",
