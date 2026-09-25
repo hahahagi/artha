@@ -15,10 +15,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Artha — Zero-Friction Expense Tracker",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://arthabot.vercel.app",
+  ),
+  title: "Artha — Zero-Friction Expense & Subscription Tracker",
   description:
-    "Catat pengeluaran dan kelola langganan tanpa ribet via Telegram Bot dan Web Dashboard.",
+    "Catat pengeluaran harian, split bill, scan struk OCR, dan kelola pengingat langganan tanpa ribet via Telegram Bot dan Web Dashboard.",
   applicationName: "Artha",
+  keywords: [
+    "Artha",
+    "Artha Bot",
+    "catat pengeluaran telegram",
+    "expense tracker indonesia",
+    "bot keuangan telegram",
+    "split bill",
+    "pengingat langganan",
+  ],
+  verification: {
+    // 👇 Tempelkan kode content dari Google Search Console di sini:
+    google: "J8eW06RPzOHZiNDLsywbsoQaYL-L31rUJ7xhfIO-PH4",
+  },
+  openGraph: {
+    title: "Artha — Zero-Friction Expense & Subscription Tracker",
+    description:
+      "Catat pengeluaran semudah chatting & voice note di Telegram, lengkap dengan Web Dashboard dan sinkronisasi Google Sheets.",
+    url: "https://arthabot.vercel.app",
+    siteName: "Artha",
+    locale: "id_ID",
+    type: "website",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
