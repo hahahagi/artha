@@ -20,15 +20,30 @@ const HEADERS = [
   "Asal Input",
 ];
 
+/**
+ * Mengekstrak Spreadsheet ID murni jika input berupa URL lengkap Google Sheets
+ */
+export function normalizeSpreadsheetId(raw: string): string {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match && match[1] ? match[1] : trimmed;
+}
+
 export function getSheetsClient() {
-  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim().replace(
+    /^["']|["']$/g,
+    "",
+  );
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY?.trim();
 
   if (!clientEmail || !privateKey) {
     throw new Error(
       "Google Service Account credentials (GOOGLE_SERVICE_ACCOUNT_EMAIL atau GOOGLE_PRIVATE_KEY) belum dikonfigurasi.",
     );
   }
+
+  // Hapus tanda kutip pembuka/penutup jika tidak sengaja ikut tersalin di Vercel Env Vars
+  privateKey = privateKey.replace(/^["']|["']$/g, "");
 
   if (privateKey.includes("\\n")) {
     privateKey = privateKey.replace(/\\n/g, "\n");
@@ -51,6 +66,7 @@ export async function appendExpenseToSheet(
   row: SheetExpenseRow,
 ) {
   const sheets = getSheetsClient();
+  const cleanId = normalizeSpreadsheetId(spreadsheetId);
 
   const values = [
     [
@@ -65,7 +81,7 @@ export async function appendExpenseToSheet(
   ];
 
   await sheets.spreadsheets.values.append({
-    spreadsheetId,
+    spreadsheetId: cleanId,
     range: "A:G",
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
@@ -81,6 +97,7 @@ export async function syncAllExpensesToSheet(
   rows: SheetExpenseRow[],
 ) {
   const sheets = getSheetsClient();
+  const cleanId = normalizeSpreadsheetId(spreadsheetId);
 
   const dataValues = [
     HEADERS,
@@ -97,12 +114,12 @@ export async function syncAllExpensesToSheet(
 
   // Bersihkan sheet terlebih dahulu lalu tulis ulang
   await sheets.spreadsheets.values.clear({
-    spreadsheetId,
+    spreadsheetId: cleanId,
     range: "A:G",
   });
 
   await sheets.spreadsheets.values.update({
-    spreadsheetId,
+    spreadsheetId: cleanId,
     range: "A1",
     valueInputOption: "USER_ENTERED",
     requestBody: { values: dataValues },

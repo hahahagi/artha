@@ -195,13 +195,21 @@ export function SettingsView({
     }
   };
 
-  const handleSaveSheetConfig = async () => {
+    const handleSaveSheetConfig = async () => {
     try {
       setSheetLoading(true);
       const res = await updateGoogleSheetsConfigAction({
         googleSheetId: sheetId,
         googleSheetAutoSync: autoSync,
       });
+      if (!res.success) {
+        showToast({
+          variant: "error",
+          title: "Gagal menyimpan pengaturan",
+          description: res.error || "Terjadi kesalahan.",
+        });
+        return;
+      }
       if (res.sheetId !== undefined) {
         setSheetId(res.sheetId || "");
       }
@@ -224,7 +232,21 @@ export function SettingsView({
   const handleManualSync = async () => {
     try {
       setSyncLoading(true);
-      const res = await syncGoogleSheetsAction();
+      const res = await syncGoogleSheetsAction({
+        googleSheetId: sheetId,
+        googleSheetAutoSync: autoSync,
+      });
+      if (!res.success) {
+        showToast({
+          variant: "error",
+          title: "Gagal sinkronisasi",
+          description: res.error || "Pastikan email Service Account sudah dijadikan Editor di Google Sheets Anda.",
+        });
+        return;
+      }
+      if (res.sheetId) {
+        setSheetId(res.sheetId);
+      }
       showToast({
         variant: "success",
         title: "Sinkronisasi selesai!",

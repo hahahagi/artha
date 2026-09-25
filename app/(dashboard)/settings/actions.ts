@@ -133,7 +133,7 @@ export async function deleteCategoryAction(id: string) {
 /**
  * Helper mengekstrak Spreadsheet ID apabila user menempelkan URL lengkap Google Sheets
  */
-function extractSpreadsheetId(raw: string | null): string | null {
+function extractSpreadsheetId(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -152,42 +152,104 @@ export async function updateGoogleSheetsConfigAction(data: {
   googleSheetId: string | null;
   googleSheetAutoSync: boolean;
 }) {
-  const user = await getAuthenticatedUser();
-  const cleanSheetId = extractSpreadsheetId(data.googleSheetId);
+  try {
+    const user = await getAuthenticatedUser();
+    const cleanSheetId = extractSpreadsheetId(data.googleSheetId);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      googleSheetId: cleanSheetId,
-      googleSheetAutoSync: data.googleSheetAutoSync,
-    },
-  });
-  revalidatePath("/settings");
-  return { success: true, sheetId: cleanSheetId };
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        googleSheetId: cleanSheetId,
+        googleSheetAutoSync: data.googleSheetAutoSync,
+      },
+    });
+    revalidatePath("/settings");
+    return { success: true, sheetId: cleanSheetId, error: null };
+  } catch (err) {
+    return {
+      success: false,
+      sheetId: null,
+      error:
+        err instanceof Error ? err.message : "Gagal menyimpan pengaturan.",
+    };
+  }
 }
 
 /**
  * Sinkronisasi manual seluruh data pengeluaran ke Google Spreadsheet
  */
-export async function syncGoogleSheetsAction() {
-  const user = await getAuthenticatedUser();
-  if (!user.googleSheetId) {
-    throw new Error("Spreadsheet ID belum diisi.");
+export async function syncGoogleSheetsAction(input?: {
+  googleSheetId?: string;
+  googleSheetAutoSync?: boolean;
+}) {
+  try {
+    const user = await getAuthenticatedUser();
+
+    // Gunakan ID terbaru dari input form jika ada, sekaligus simpan ke DB
+    const targetSheetId = extractSpreadsheetId(
+      input?.googleSheetId !== undefined
+        ? input.googleSheetId
+        : user.googleSheetId,
+    );
+
+    if (!targetSheetId) {
+      return {
+        success: false,
+        count: 0,
+        sheetId: null,
+        error: "Spreadsheet ID atau Link Google Sheets belum diisi.",
+      };
+    }
+
+    if (
+      targetSheetId !== user.googleSheetId ||
+      (input?.googleSheetAutoSync !== undefined &&
+        input.googleSheetAutoSync !== user.googleSheetAutoSync)
+    ) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleSheetId: targetSheetId,
+          ...(input?.googleSheetAutoSync !== undefined
+            ? { googleSheetAutoSync: input.googleSheetAutoSync }
+            : {}),
+        },
+      });
+    }
+
+    const expenses = await prisma.expense.findMany({
+      where: { userId: user.id },
+      include: { category: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const rows: SheetExpenseRow[] = expenses.map((e) => ({
+      date: e.createdAt.toLocaleDateString("id-ID"),
+      itemName: e.itemName,
+      category: e.category?.name || "Lainnya",
+      amount: e.amount,
+      currency: e.currency,
+      wallet: e.wallet || undefined,
+      source: e.source,
+    }));
+
+    await syncAllExpensesToSheet(targetSheetId, rows);
+    revalidatePath("/settings");
+    return {
+      success: true,
+      count: rows.length,
+      sheetId: targetSheetId,
+      error: null,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      count: 0,
+      sheetId: null,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Gagal menyinkronkan ke Google Sheets.",
+    };
   }
-  const expenses = await prisma.expense.findMany({
-    where: { userId: user.id },
-    include: { category: true },
-    orderBy: { createdAt: "asc" },
-  });
-  const rows: SheetExpenseRow[] = expenses.map((e) => ({
-    date: e.createdAt.toLocaleDateString("id-ID"),
-    itemName: e.itemName,
-    category: e.category?.name || "Lainnya",
-    amount: e.amount,
-    currency: e.currency,
-    wallet: e.wallet || undefined,
-    source: e.source,
-  }));
-  await syncAllExpensesToSheet(user.googleSheetId, rows);
-  return { success: true, count: rows.length };
 }
