@@ -355,49 +355,79 @@ export function SubscriptionsView({
                 key={sub.id}
                 className={`relative overflow-hidden transition hover:shadow-md ${
                   !sub.isActive
-                    ? "opacity-60 bg-zinc-50/50 dark:bg-zinc-900/30"
+                    ? "border-dashed bg-zinc-50/70 dark:bg-zinc-900/40"
                     : ""
                 }`}
               >
-                {isDueSoon && (
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500" />
-                )}
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                {/* Top Status Accent Bar */}
+                <div
+                  className={`absolute top-0 left-0 right-0 h-1 ${
+                    !sub.isActive
+                      ? "bg-zinc-300 dark:bg-zinc-700"
+                      : isDueSoon
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                  }`}
+                />
+
+                <CardHeader className="pb-3 pt-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle
+                        className={`truncate text-base font-bold ${
+                          sub.isActive
+                            ? "text-zinc-900 dark:text-zinc-100"
+                            : "text-zinc-500 dark:text-zinc-400"
+                        }`}
+                      >
                         {sub.serviceName}
                       </CardTitle>
-                      <CardDescription className="text-xs mt-0.5">
-                        Tagihan tgl {sub.billingDay} setiap bulan
+                      <CardDescription className="mt-0.5 text-xs">
+                        {sub.isActive
+                          ? `Tagihan tgl ${sub.billingDay} setiap bulan`
+                          : `Tagihan tgl ${sub.billingDay} (Pengingat nonaktif)`}
                       </CardDescription>
                     </div>
-                    <Badge
-                      variant={
-                        sub.isActive
-                          ? isDueSoon
-                            ? "default"
-                            : "secondary"
-                          : "outline"
-                      }
-                      className={`text-[10px] ${
-                        !sub.isActive
-                          ? "text-zinc-400"
-                          : isDueSoon
-                            ? "bg-amber-500 text-white hover:bg-amber-600"
-                            : ""
-                      }`}
-                    >
-                      {!sub.isActive
-                        ? "Dijeda"
-                        : daysLeft === 0
-                          ? "Hari Ini"
-                          : `${daysLeft} hari lagi`}
-                    </Badge>
+
+                    {/* Indikator Status Eksplisit */}
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      {sub.isActive ? (
+                        <>
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/60 dark:text-emerald-400">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Aktif
+                          </span>
+                          <Badge
+                            variant={isDueSoon ? "default" : "secondary"}
+                            className={`text-[10px] ${
+                              isDueSoon
+                                ? "bg-amber-500 text-white hover:bg-amber-600"
+                                : ""
+                            }`}
+                          >
+                            {daysLeft === 0
+                              ? "Hari Ini"
+                              : `${daysLeft} hari lagi`}
+                          </Badge>
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-zinc-100 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                          <PauseCircle className="h-3 w-3" />
+                          Dijeda
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
+
                 <CardContent className="space-y-4">
-                  <div className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <div
+                    className={`text-xl font-bold ${
+                      sub.isActive
+                        ? "text-zinc-900 dark:text-zinc-50"
+                        : "text-zinc-400 dark:text-zinc-500"
+                    }`}
+                  >
                     {formatCurrency(sub.amount, sub.currency)}
                     <span className="text-xs font-normal text-zinc-400">
                       {" "}
@@ -406,25 +436,44 @@ export function SubscriptionsView({
                   </div>
 
                   <div className="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                    {/* Interactive Toggle Switch Status */}
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={sub.isActive}
+                      disabled={loading}
                       onClick={() => handleToggleActive(sub)}
-                      className={`flex items-center gap-1.5 text-xs font-medium transition ${
-                        sub.isActive
-                          ? "text-zinc-500 hover:text-amber-600"
-                          : "text-emerald-600 hover:text-emerald-700"
-                      }`}
+                      className="group flex items-center gap-2.5 text-left focus:outline-none disabled:opacity-50"
                     >
-                      {sub.isActive ? (
-                        <>
-                          <PauseCircle className="h-4 w-4" />
-                          <span>Jeda</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>Aktifkan</span>
-                        </>
-                      )}
+                      <div
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                          sub.isActive
+                            ? "bg-emerald-600 group-hover:bg-emerald-500 dark:bg-emerald-500"
+                            : "bg-zinc-300 group-hover:bg-zinc-400 dark:bg-zinc-700 dark:group-hover:bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-xs transition-transform duration-200 ${
+                            sub.isActive ? "translate-x-4" : "translate-x-1"
+                          }`}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span
+                          className={`text-xs font-semibold leading-tight ${
+                            sub.isActive
+                              ? "text-emerald-700 dark:text-emerald-400"
+                              : "text-zinc-500 dark:text-zinc-400"
+                          }`}
+                        >
+                          {sub.isActive ? "Status: Aktif" : "Status: Dijeda"}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300">
+                          {sub.isActive
+                            ? "Klik untuk menjeda"
+                            : "Klik untuk aktifkan"}
+                        </span>
+                      </div>
                     </button>
 
                     <div className="flex items-center gap-1">
