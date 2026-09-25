@@ -45,3 +45,12 @@ export function parseThousandInput(value: string): number {
   if (!digits) return 0;
   return parseInt(digits, 10) || 0;
 }
+
+/**
+ * Mengambil bagian username dari alamat email (sebelum karakter '@')
+ * Contoh: "hagis@gmail.com" -> "hagis"
+ */
+export function getEmailUsername(email?: string | null): string {
+  if (!email || !email.trim()) return "User";
+  return email.trim().split("@")[0] || "User";
+}

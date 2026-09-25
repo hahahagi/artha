@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getEmailUsername } from "@/lib/utils/format";
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -74,7 +75,7 @@ export function DashboardSidebar({ userEmail }: { userEmail?: string }) {
         <div className="mb-3 px-2">
           <p className="text-xs text-zinc-400">Masuk sebagai</p>
           <p className="truncate text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-            {userEmail || "User"}
+            {getEmailUsername(userEmail)}
           </p>
         </div>
         <button

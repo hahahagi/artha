@@ -3,6 +3,7 @@ import {
   formatCurrency,
   formatThousandInput,
   parseThousandInput,
+  getEmailUsername,
 } from "../format";
 
 describe("Format Currency Utility", () => {
@@ -94,6 +95,19 @@ describe("Format Currency Utility", () => {
       expect(parseThousandInput("25.000")).toBe(25000);
       expect(parseThousandInput("1.500.000")).toBe(1500000);
       expect(parseThousandInput("")).toBe(0);
+    });
+  });
+
+  describe("Email Username Helper", () => {
+    it("mengekstrak username sebelum tanda @ dari email", () => {
+      expect(getEmailUsername("hagis@gmail.com")).toBe("hagis");
+      expect(getEmailUsername("john.doe@company.co.id")).toBe("john.doe");
+    });
+
+    it("mengembalikan User jika email kosong atau undefined", () => {
+      expect(getEmailUsername("")).toBe("User");
+      expect(getEmailUsername(null)).toBe("User");
+      expect(getEmailUsername(undefined)).toBe("User");
     });
   });
 });

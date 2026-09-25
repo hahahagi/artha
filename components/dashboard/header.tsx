@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getEmailUsername } from "@/lib/utils/format";
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -63,8 +64,8 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <span className="hidden text-xs text-zinc-500 sm:inline-block">
-            {userEmail}
+          <span className="hidden text-xs font-medium text-zinc-600 dark:text-zinc-300 sm:inline-block">
+            {getEmailUsername(userEmail)}
           </span>
           <button
             onClick={handleSignOut}
@@ -123,7 +124,9 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
             </nav>
 
             <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
-              <p className="mb-2 truncate text-xs text-zinc-400">{userEmail}</p>
+              <p className="mb-2 truncate text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                {getEmailUsername(userEmail)}
+              </p>
               <button
                 onClick={handleSignOut}
                 className="flex w-full items-center gap-2 rounded-lg py-2 text-xs font-medium text-red-600 dark:text-red-400"
