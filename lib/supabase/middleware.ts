@@ -16,17 +16,17 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
+            request.cookies.set(name, value),
           );
           supabaseResponse = NextResponse.next({
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   // Gunakan getUser() untuk validasi sesi yang aman dari server Supabase
@@ -36,19 +36,21 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // 1. Lewati endpoint API dan OAuth Callback (jangan diblokir oleh auth guard)
+  // 1. Lewati endpoint API, SEO (robots/sitemap), dan OAuth Callback (jangan diblokir oleh auth guard)
   if (
     pathname.startsWith("/api/telegram") ||
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/health") ||
     pathname.startsWith("/callback") ||
     pathname.endsWith(".webmanifest") ||
-    pathname === "/manifest.json"
+    pathname === "/manifest.json" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml"
   ) {
     return supabaseResponse;
   }
 
-    const isAuthRoute =
+  const isAuthRoute =
     pathname === "/login" ||
     pathname === "/register" ||
     pathname === "/forgot-password" ||
@@ -67,6 +69,6 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
-  
+
   return supabaseResponse;
 }
