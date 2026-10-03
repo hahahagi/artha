@@ -234,7 +234,7 @@ export function ExpensesTable({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full max-w-full min-w-0">
       {/* Action Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
@@ -283,7 +283,8 @@ export function ExpensesTable({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Tombol Aksi (Otomatis membungkus rapi di layar HP) */}
+        <div className="flex flex-wrap items-center gap-2">
           {/* Tombol Scan Struk */}
           <Button
             variant="outline"
@@ -316,7 +317,7 @@ export function ExpensesTable({
       </div>
 
       {/* Tabel Transaksi */}
-      <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="w-full max-w-full overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
         <Table>
           <TableHeader>
             <TableRow>

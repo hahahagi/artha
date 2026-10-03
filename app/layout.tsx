@@ -70,6 +70,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false
 };
 
 export default function RootLayout({
@@ -102,7 +103,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col w-full max-w-full overflow-x-hidden">
         <FeedbackProvider>
           {children}
           <PwaRegister />

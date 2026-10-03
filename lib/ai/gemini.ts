@@ -4,8 +4,43 @@ export interface ScannedReceiptResult {
   rawText?: string;
 }
 
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+
 /**
- * Membaca foto struk belanja menggunakan Google Gemini 1.5 Flash (Vision)
+ * Helper untuk memanggil Gemini API dengan fallback model otomatis jika salah satu model sibuk
+ */
+async function callGeminiApi(
+  apiKey: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (const model of GEMINI_MODELS) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      // Jika error 404 atau 503, coba model berikutnya
+      const errText = await response.text();
+      lastError = new Error(`Gemini ${model} error (${response.status}): ${errText}`);
+    } catch (err) {
+      lastError = err as Error;
+    }
+  }
+
+  throw lastError || new Error("Failed to call Gemini API across all models");
+}
+
+/**
+ * Membaca foto struk belanja menggunakan Google Gemini 2.5 Flash (Vision)
  */
 export async function scanReceiptWithGemini(
   imageBuffer: Buffer,
@@ -17,9 +52,7 @@ export async function scanReceiptWithGemini(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
   const base64Data = imageBuffer.toString("base64");
-
   const prompt = `
 Anda adalah asisten cerdas pembaca struk kasir di Indonesia (Indomaret, Alfamart, SPBU, restoran, cafe, dll).
 Tugas Anda:
@@ -33,34 +66,25 @@ Kembalikan HANYA format JSON valid berikut:
 }
 `.trim();
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType,
-                data: base64Data,
-              },
+  const response = await callGeminiApi(key, {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType,
+              data: base64Data,
             },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.1,
-        responseMimeType: "application/json",
+          },
+        ],
       },
-    }),
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json",
+    },
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini Vision API error: ${response.status} ${errorText}`);
-  }
 
   const json = await response.json();
   const textOutput = json.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -85,7 +109,7 @@ Kembalikan HANYA format JSON valid berikut:
 }
 
 /**
- * Mentranskripsi pesan suara audio (OGG/Opus Telegram) menggunakan Gemini 1.5 Flash Speech
+ * Mentranskripsi pesan suara audio (OGG/Opus Telegram) menggunakan Gemini 2.5 Flash
  */
 export async function transcribeAudioWithGemini(
   audioBuffer: Buffer,
@@ -97,9 +121,7 @@ export async function transcribeAudioWithGemini(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
   const base64Data = audioBuffer.toString("base64");
-
   const prompt = `
 Dengarkan audio rekaman suara bahasa Indonesia berikut.
 Transkripsikan persis apa yang diucapkan pembicara mengenai transaksi keuangan/pengeluaran.
@@ -108,33 +130,24 @@ Aturan:
 - Contoh keluaran yang diharapkan: "kopi susu dua puluh lima ribu pakai gopay" atau "makan siang tiga puluh lima ribu bca".
 `.trim();
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType,
-                data: base64Data,
-              },
+  const response = await callGeminiApi(key, {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType,
+              data: base64Data,
             },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.1,
+          },
+        ],
       },
-    }),
+    ],
+    generationConfig: {
+      temperature: 0.1,
+    },
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini Audio API error: ${response.status} ${errorText}`);
-  }
 
   const json = await response.json();
   const textOutput = json.candidates?.[0]?.content?.parts?.[0]?.text;
