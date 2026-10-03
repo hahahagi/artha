@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { parseReceiptText } from "@/lib/parser/receipt-parser";
+import { scanReceiptAction } from "@/app/(dashboard)/expenses/actions";
 import {
   formatCurrency,
   formatThousandInput,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Camera, Upload, X, Check, Loader2, RefreshCw } from "lucide-react";
+import { Camera, Upload, X, Check, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useFeedback } from "@/components/ui/feedback-provider";
 
 interface ReceiptScannerProps {
@@ -26,8 +26,6 @@ export function ReceiptScanner({
   const { showToast } = useFeedback();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState("");
   const [detectedItem, setDetectedItem] = useState("");
   const [detectedAmount, setDetectedAmount] = useState<number>(0);
   const [scanDone, setScanDone] = useState(false);
@@ -43,57 +41,40 @@ export function ReceiptScanner({
     setImagePreview(previewUrl);
     setScanDone(false);
     setIsProcessing(true);
-    setProgress(0);
-    setStatusMessage("Menyiapkan OCR engine...");
 
     try {
-      const { createWorker } = await import("tesseract.js");
-      const worker = await createWorker("ind+eng", undefined, {
-        logger: (m) => {
-          if (m.status === "recognizing text") {
-            setProgress(Math.round((m.progress || 0) * 100));
-            setStatusMessage(
-              `Membaca struk... ${Math.round((m.progress || 0) * 100)}%`,
-            );
-          } else {
-            setStatusMessage("Memuat model bahasa...");
-          }
-        },
-      });
+      const formData = new FormData();
+      formData.append("receipt", file);
 
-      const {
-        data: { text },
-      } = await worker.recognize(file);
-      await worker.terminate();
+      const res = await scanReceiptAction(formData);
 
-      const parsed = parseReceiptText(text);
-      if (parsed) {
-        const title = parsed.merchantName
-          ? `Belanja ${parsed.merchantName}`
+      if (res.success && res.data) {
+        const title = res.data.merchantName
+          ? `Belanja ${res.data.merchantName}`
           : "Belanja Struk";
         setDetectedItem(title);
-        setDetectedAmount(parsed.totalAmount);
+        setDetectedAmount(res.data.totalAmount);
         showToast({
           variant: "success",
-          title: "Struk berhasil dipindai!",
-          description: `Terdeteksi ${title} — ${formatCurrency(parsed.totalAmount, "IDR")}`,
+          title: "Struk Berhasil Dianalisis Gemini AI! ✨",
+          description: `Terdeteksi: ${title} — ${formatCurrency(res.data.totalAmount, "IDR")}`,
         });
       } else {
         setDetectedItem("Belanja Struk");
         setDetectedAmount(0);
         showToast({
           variant: "warning",
-          title: "Nominal belum terbaca otomatis",
-          description: "Silakan isi atau koreksi nominal struk secara manual.",
+          title: "Nominal Belum Terbaca Otomatis",
+          description: res.error || "Silakan masukkan nominal struk secara manual.",
         });
       }
       setScanDone(true);
     } catch (err) {
-      console.error("[OCR Error]:", err);
+      console.error("[Receipt Scan Error]:", err);
       showToast({
         variant: "error",
-        title: "Gagal memproses struk",
-        description: "Silakan coba gunakan foto struk yang lebih jelas.",
+        title: "Gagal Memproses Struk",
+        description: "Terjadi kesalahan saat memproses gambar. Pastikan GEMINI_API_KEY sudah diset.",
       });
     } finally {
       setIsProcessing(false);
@@ -105,7 +86,6 @@ export function ReceiptScanner({
     setScanDone(false);
     setDetectedItem("");
     setDetectedAmount(0);
-    setProgress(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -137,9 +117,15 @@ export function ReceiptScanner({
         <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
           <div className="flex items-center gap-2">
             <Camera className="h-5 w-5 text-indigo-500" />
-            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-              Scan Struk Belanja
-            </h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Scan Struk Belanja
+              </h3>
+              <span className="flex items-center gap-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                <Sparkles className="h-3 w-3" />
+                Gemini AI
+              </span>
+            </div>
           </div>
           <button
             onClick={() => {
@@ -174,7 +160,7 @@ export function ReceiptScanner({
                 Ambil foto atau pilih struk dari galeri
               </p>
               <p className="mt-1 text-xs text-zinc-400">
-                Mendukung format JPG, PNG, atau WebP
+                Gemini Vision AI otomatis mendeteksi nama toko dan total belanja
               </p>
             </div>
           ) : (
@@ -189,20 +175,9 @@ export function ReceiptScanner({
               </div>
 
               {isProcessing && (
-                <div className="space-y-2 rounded-xl bg-zinc-50 p-4 dark:bg-zinc-900">
-                  <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
-                      {statusMessage}
-                    </span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-                    <div
-                      className="h-full bg-indigo-600 transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
+                <div className="flex items-center justify-center gap-2 rounded-xl bg-zinc-50 p-4 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+                  <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                  <span>Gemini AI sedang membaca struk...</span>
                 </div>
               )}
 

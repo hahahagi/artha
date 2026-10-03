@@ -132,3 +132,51 @@ export async function deleteExpenseAction(id: string) {
   revalidatePath("/");
   return { success: true };
 }
+
+import { scanReceiptWithGemini } from "@/lib/ai/gemini";
+
+/**
+ * Server Action: Scan Struk Belanja dengan Gemini AI Vision
+ */
+export async function scanReceiptAction(formData: FormData): Promise<{
+  success: boolean;
+  data?: { merchantName?: string; totalAmount: number };
+  error?: string;
+}> {
+  try {
+    await getAuthenticatedUser();
+    const file = formData.get("receipt") as File | null;
+    if (!file || file.size === 0) {
+      return { success: false, error: "File gambar struk tidak ditemukan." };
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const mimeType = file.type || "image/jpeg";
+
+    const result = await scanReceiptWithGemini(buffer, mimeType);
+    if (!result || result.totalAmount <= 0) {
+      return {
+        success: false,
+        error: "Nominal total struk tidak terdeteksi. Silakan coba foto yang lebih jelas atau isi manual.",
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        merchantName: result.merchantName,
+        totalAmount: result.totalAmount,
+      },
+    };
+  } catch (err) {
+    console.error("[Scan Receipt Action Error]:", err);
+    return {
+      success: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Gagal memproses struk dengan Gemini AI.",
+    };
+  }
+}

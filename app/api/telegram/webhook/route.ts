@@ -362,20 +362,23 @@ export async function POST(req: NextRequest) {
     let text = message.text ? message.text.trim() : "";
     let isVoice = false;
 
-    // Tangani Pesan Suara (Voice Note) via Wit.ai
+    // Tangani Pesan Suara (Voice Note) via Gemini AI / Wit.ai
     if (message.voice) {
-      const witToken = process.env.WIT_AI_TOKEN;
-      if (!witToken) {
+      const hasAiKey =
+        process.env.GEMINI_API_KEY ||
+        process.env.WIT_AI_TOKEN ||
+        process.env.GROQ_API_KEY;
+      if (!hasAiKey) {
         await sendTelegramMessage(
           chatId,
-          "🎤 <b>Pesan Suara Diterima</b>\n\nFitur transkripsi suara belum aktif karena token Wit.ai (<code>WIT_AI_TOKEN</code>) belum dikonfigurasi di server. Silakan ketik pengeluaran dengan teks.",
+          "🎤 <b>Pesan Suara Diterima</b>\n\nFitur transkripsi suara belum aktif karena <code>GEMINI_API_KEY</code> belum dikonfigurasi di server. Silakan ketik pengeluaran dengan teks.",
         );
         return NextResponse.json({ ok: true });
       }
 
       try {
         const audioBuffer = await downloadTelegramFile(message.voice.file_id);
-        const transcribed = await transcribeVoiceNote(audioBuffer, witToken);
+        const transcribed = await transcribeVoiceNote(audioBuffer);
 
         if (!transcribed) {
           await sendTelegramMessage(
